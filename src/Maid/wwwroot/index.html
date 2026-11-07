@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:">
+  <title>Maid</title>
+  <link rel="stylesheet" href="lib/xterm.css">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header id="topbar">
+    <button type="button" id="sidebar-toggle" class="icon-btn" title="Show or hide the session list (Ctrl+Shift+B)" aria-label="Toggle session list">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.75" y="2.75" width="12.5" height="10.5" rx="2"/><path d="M6 2.75v10.5"/></svg>
+    </button>
+
+    <div class="brand" aria-hidden="true">
+      <svg viewBox="0 0 16 16"><rect class="live" x="1" y="1" width="6.2" height="6.2" rx="1.6"/><rect x="8.8" y="1" width="6.2" height="6.2" rx="1.6"/><rect x="1" y="8.8" width="6.2" height="6.2" rx="1.6"/><rect x="8.8" y="8.8" width="6.2" height="6.2" rx="1.6"/></svg>
+      <span>Maid</span>
+    </div>
+
+    <form id="new-session" autocomplete="off">
+      <div class="path-field">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 4.25c0-.83.67-1.5 1.5-1.5h2.9c.4 0 .78.16 1.06.44l.85.85c.1.1.22.15.36.15h4.33c.83 0 1.5.67 1.5 1.5v6.06c0 .83-.67 1.5-1.5 1.5h-9.5c-.83 0-1.5-.67-1.5-1.5v-7.5z"/></svg>
+        <input id="path-input" type="text" spellcheck="false" aria-label="Project folder path"
+               placeholder="Project folder to add — e.g. C:\Projects\my-app">
+        <button type="button" id="browse-btn" title="Browse for a folder">Browse…</button>
+      </div>
+      <div class="group-field" title="Group to list the project under (blank = Misc). Type a new name to create a group.">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 2.5h5.3l5.7 5.7-5.3 5.3-5.7-5.7z"/><circle class="fill" cx="5.6" cy="5.6" r="1.1"/></svg>
+        <input id="group-input" type="text" list="group-options" spellcheck="false" aria-label="Group" placeholder="Misc">
+        <datalist id="group-options"></datalist>
+      </div>
+      <button type="submit" id="add-btn" class="primary" title="Add this folder to the session list (Enter). Start it from the list when you need it.">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" stroke-width="2"/></svg>
+        Add
+      </button>
+    </form>
+
+    <div class="toolbar">
+      <div class="segmented" id="columns" role="group" aria-label="Grid columns" title="Grid columns">
+        <button type="button" data-columns="0">Auto</button>
+        <button type="button" data-columns="1">1</button>
+        <button type="button" data-columns="2">2</button>
+        <button type="button" data-columns="3">3</button>
+        <button type="button" data-columns="4">4</button>
+      </div>
+      <div class="segmented" role="group" aria-label="Terminal font size">
+        <button type="button" id="font-smaller" title="Smaller terminal text (Ctrl+-)">A−</button>
+        <button type="button" id="font-larger" title="Larger terminal text (Ctrl+=)">A+</button>
+      </div>
+      <button type="button" id="hub-btn" class="toggle-btn"
+              title="Start a Claude Code session about all projects at once: it can change the instructions they share (shared-info.md) and work across their folders">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="1.9"/><circle cx="3" cy="3.4" r="1.3"/><circle cx="13" cy="3.4" r="1.3"/><circle cx="3" cy="12.6" r="1.3"/><circle cx="13" cy="12.6" r="1.3"/><path d="m4 4.4 2.6 2.3M12 4.4 9.4 6.7M4 11.6l2.6-2.3M12 11.6 9.4 9.3"/></svg>
+        <span class="label">All projects</span>
+        <span class="dot" aria-hidden="true"></span>
+        <span id="hub-count" class="entry-count" hidden></span>
+      </button>
+      <button type="button" id="info-btn" class="toggle-btn"
+              title="Shared info: a text Maid keeps in the CLAUDE.md and AGENTS.md of every project in the list">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 2.5h9v11h-9z"/><path d="M5.8 5.6h4.4M5.8 8h4.4M5.8 10.4h2.6"/></svg>
+        <span class="label">Shared info</span>
+      </button>
+      <button type="button" id="phone-btn" class="toggle-btn"
+              title="Phone app: watch and run these sessions from your Android phone, through Tailscale">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="4.25" y="1.75" width="7.5" height="12.5" rx="1.6"/><path d="M7 11.9h2"/></svg>
+        <span class="label">Phone</span>
+        <span class="dot" aria-hidden="true"></span>
+      </button>
+      <button type="button" id="edit-toggle" class="toggle-btn" aria-pressed="false"
+              title="Edit the project list: add, rename, reorder, group or remove projects (Ctrl+Shift+E). Off whenever Maid starts.">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m11.1 2.6 2.3 2.3-8.1 8.1-3 .7.7-3z"/><path d="m9.6 4.1 2.3 2.3"/></svg>
+        <span class="label">Edit</span>
+      </button>
+      <button type="button" id="help-btn" class="toggle-btn icon-only" aria-label="Help"
+              title="Help: getting started, what Maid changes in your projects, keyboard shortcuts (F1)">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25"/><path d="M6.15 6.2a1.95 1.95 0 1 1 2.75 1.8c-.55.24-.9.7-.9 1.25v.35"/><circle class="fill" cx="8" cy="11.45" r=".85"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div id="form-error" role="alert" hidden></div>
+
+  <main>
+    <aside id="sidebar">
+      <div class="side-head">
+        <span>Sessions</span>
+        <span id="side-summary"></span>
+        <button type="button" id="add-group" class="icon-btn" title="New group" aria-label="New group">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9"/></svg>
+        </button>
+      </div>
+      <ul id="entry-list"></ul>
+      <p id="side-empty">Projects you add are listed here, grouped under labels of your choice. Press ▶ next to one to start Claude Code in it.</p>
+    </aside>
+    <div id="sidebar-resizer" role="separator" aria-orientation="vertical" aria-label="Resize the session list" title="Drag to resize the list · double-click for the usual width"></div>
+
+    <section id="stage">
+      <div id="grid"></div>
+      <div id="empty-state">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><rect class="live" x="1" y="1" width="6.2" height="6.2" rx="1.6"/><rect x="8.8" y="1" width="6.2" height="6.2" rx="1.6"/><rect x="1" y="8.8" width="6.2" height="6.2" rx="1.6"/><rect x="8.8" y="8.8" width="6.2" height="6.2" rx="1.6"/></svg>
+        <h1>No sessions open</h1>
+        <p id="empty-hint"></p>
+        <p class="command" id="empty-command"></p>
+      </div>
+    </section>
+  </main>
+
+  <div id="group-menu" class="menu" role="menu" hidden></div>
+
+  <dialog id="confirm-dialog" class="dialog" aria-labelledby="confirm-title">
+    <h2 id="confirm-title"></h2>
+    <p id="confirm-detail" class="dialog-path"></p>
+    <p id="confirm-note"></p>
+    <div class="dialog-actions">
+      <button type="button" id="confirm-cancel">Cancel</button>
+      <button type="button" id="confirm-ok" class="danger">Remove</button>
+    </div>
+  </dialog>
+
+  <dialog id="info-dialog" class="dialog wide" aria-labelledby="info-title">
+    <h2 id="info-title">Shared info</h2>
+    <p>Kept in the <code>CLAUDE.md</code> (and so the <code>AGENTS.md</code>) of every project in the list, and of
+      every project added later, in a section of its own. Saving rewrites that section in all of them; save it
+      empty to take it out again. The <b>All projects</b> session edits the same text as <code>shared-info.md</code>.</p>
+    <textarea id="info-text" spellcheck="false" maxlength="20000" aria-labelledby="info-title"
+              placeholder="Markdown, written as it is — e.g. conventions that hold for all your projects."></textarea>
+    <p id="info-status" role="status" hidden></p>
+    <div class="dialog-actions">
+      <button type="button" id="info-cancel">Cancel</button>
+      <button type="button" id="info-save" class="accent" title="Save (Ctrl+Enter)">Save</button>
+    </div>
+  </dialog>
+
+  <dialog id="move-dialog" class="dialog wide" aria-labelledby="move-title">
+    <h2 id="move-title">Move to another folder</h2>
+    <p id="move-from" class="dialog-path"></p>
+    <div class="path-field dialog-field">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 4.25c0-.83.67-1.5 1.5-1.5h2.9c.4 0 .78.16 1.06.44l.85.85c.1.1.22.15.36.15h4.33c.83 0 1.5.67 1.5 1.5v6.06c0 .83-.67 1.5-1.5 1.5h-9.5c-.83 0-1.5-.67-1.5-1.5v-7.5z"/></svg>
+      <input id="move-path" type="text" spellcheck="false" aria-label="New folder of the project">
+      <button type="button" id="move-browse" title="Choose the folder to move it into">Browse…</button>
+    </div>
+    <p>Everything in the folder moves to the new one, which must not exist yet (or be empty); Claude Code's
+      conversations of the project move along. Its sessions have to be stopped first.</p>
+    <p id="move-status" role="status" hidden></p>
+    <div class="dialog-actions">
+      <button type="button" id="move-cancel">Cancel</button>
+      <button type="button" id="move-ok" class="accent" title="Move (Enter)">Move</button>
+    </div>
+  </dialog>
+
+  <dialog id="rename-dialog" class="dialog wide" aria-labelledby="rename-title">
+    <h2 id="rename-title">Rename a folder</h2>
+    <p>Click a folder in the path to rename one further up; every project in the list that is in it follows.</p>
+    <div class="rename-from">
+      <div id="rename-crumbs" class="crumbs" role="group" aria-label="Folder to rename"></div>
+      <button type="button" id="rename-browse" title="Choose another folder to rename">Browse…</button>
+    </div>
+    <div class="path-field dialog-field">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.75 4.25c0-.83.67-1.5 1.5-1.5h2.9c.4 0 .78.16 1.06.44l.85.85c.1.1.22.15.36.15h4.33c.83 0 1.5.67 1.5 1.5v6.06c0 .83-.67 1.5-1.5 1.5h-9.5c-.83 0-1.5-.67-1.5-1.5v-7.5z"/></svg>
+      <span id="rename-parent"></span>
+      <input id="rename-name" type="text" spellcheck="false" aria-label="New name of the folder">
+    </div>
+    <label id="rename-project-option" class="dialog-check">
+      <input type="checkbox" id="rename-project">
+      <span id="rename-project-label"></span>
+    </label>
+    <div id="rename-affected"></div>
+    <p id="rename-status" role="status" hidden></p>
+    <div class="dialog-actions">
+      <button type="button" id="rename-cancel">Cancel</button>
+      <button type="button" id="rename-ok" class="accent" title="Rename (Enter)">Rename</button>
+    </div>
+  </dialog>
+
+  <dialog id="phone-dialog" class="dialog wide" aria-labelledby="phone-title">
+    <h2 id="phone-title">Phone</h2>
+    <p>The Maid app on your Android phone shows these sessions one at a time: watch them, type or dictate into them, start
+      and stop them. It reaches this PC only through <b>Tailscale</b>, and only the phone paired here gets in (it
+      proves itself with a key that never leaves the phone).</p>
+    <label class="dialog-check">
+      <input type="checkbox" id="phone-enabled">
+      <span>Let the paired phone connect</span>
+    </label>
+    <div id="phone-state"></div>
+    <div id="phone-pairing" hidden>
+      <img id="phone-qr" alt="Pairing code for the Maid app">
+      <div>
+        <ol>
+          <li>On the phone, install <b>Tailscale</b> and sign in with the same account as this PC.</li>
+          <li>Open the <b>Maid</b> app and tap <b>Scan pairing code</b>.</li>
+          <li>Point the phone at this code.</li>
+        </ol>
+        <p id="phone-expiry"></p>
+        <button type="button" id="phone-copy-link" class="link-btn"
+                title="For a phone that cannot scan: get the link to it and paste it in the app">Copy the pairing link instead</button>
+      </div>
+    </div>
+    <details id="phone-log-box" hidden>
+      <summary>Recent connections</summary>
+      <ul id="phone-log"></ul>
+    </details>
+    <div class="dialog-actions">
+      <button type="button" id="phone-forget" class="quiet-danger" hidden>Forget this phone</button>
+      <button type="button" id="phone-pair">Pair a phone…</button>
+      <button type="button" id="phone-close" class="accent">Done</button>
+    </div>
+  </dialog>
+
+  <dialog id="help-dialog" class="dialog help" aria-labelledby="help-title">
+    <header class="help-head">
+      <svg class="help-logo" viewBox="0 0 16 16" aria-hidden="true"><rect class="live" x="1" y="1" width="6.2" height="6.2" rx="1.6"/><rect x="8.8" y="1" width="6.2" height="6.2" rx="1.6"/><rect x="1" y="8.8" width="6.2" height="6.2" rx="1.6"/><rect x="8.8" y="8.8" width="6.2" height="6.2" rx="1.6"/></svg>
+      <div>
+        <h2 id="help-title">Welcome to Maid</h2>
+        <p>All your Claude Code sessions in one window: each project runs in a terminal tile of its own, side by side.</p>
+      </div>
+      <span id="help-version"></span>
+    </header>
+
+    <div class="help-scroll" id="help-scroll">
+      <div id="help-claude" class="help-callout" role="alert" hidden></div>
+
+      <section class="help-start">
+        <h3>Get started</h3>
+        <ol class="help-steps">
+          <li><b>Turn on Edit</b> at the top right (Ctrl+Shift+E). Everything that changes the list waits behind it, so day
+            to day the list only starts and stops sessions.</li>
+          <li><b>Add a project folder</b>: paste its path or pick it with Browse…, type a group if you like (none = Misc),
+            then <b>Add</b>. Adding only lists it.</li>
+          <li><b>Press <i data-icon="play"></i></b> next to the project. Claude Code starts in that folder, in a tile on the
+            right.</li>
+        </ol>
+        <button type="button" id="help-add" class="help-cta">Add a project now</button>
+      </section>
+
+      <div class="help-grid">
+        <section>
+          <h3>Running sessions</h3>
+          <ul>
+            <li><i data-icon="play"></i> starts Claude Code. Press it again while one runs to open another session of the
+              same project (#1, #2…).</li>
+            <li><i data-icon="resume"></i> starts it with <code>--continue</code>, picking up the last conversation in that
+              folder.</li>
+            <li><i data-icon="stop"></i> stops a project's sessions (click twice to confirm). Clicking a row jumps to its
+              sessions.</li>
+            <li>A tile whose session ended keeps its last screen and offers <b>Launch</b>, <b>Resume</b> and <b>Close</b>.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h3>What the dots say</h3>
+          <ul class="help-dots">
+            <li class="is-busy"><span class="dot"></span>Working on a prompt</li>
+            <li class="is-attention"><span class="dot"></span>Waiting for you</li>
+            <li class="is-running"><span class="dot"></span>Ready for a prompt</li>
+            <li class="is-starting"><span class="dot"></span>Starting</li>
+            <li><span class="dot"></span>Not running</li>
+            <li class="is-failed"><span class="dot"></span>Could not start</li>
+          </ul>
+          <p>"Waiting for you" means the turn is over or Claude asks something. A group's header sums up the projects
+            inside it.</p>
+        </section>
+
+        <section>
+          <h3>Organising the list <span class="help-tag">Edit</span></h3>
+          <ul>
+            <li>Projects go under groups of your own; <i data-icon="plus"></i> in the list's header makes one, and groups
+              can sit inside groups. Click a group to fold it.</li>
+            <li>Drag projects and groups to reorder them, or use the <i data-icon="more"></i> menus to rename, reorder or
+              regroup them.</li>
+            <li><i data-icon="color"></i> on a group's header writes its projects' terminal text in a colour, to tell them
+              apart at a glance.</li>
+            <li>A project's <i data-icon="more"></i> menu can also move or rename its folder on disk; Claude Code's saved
+              conversations follow it.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h3>Working across projects</h3>
+          <ul>
+            <li><b>All projects</b> starts a Claude Code session about every listed project at once, in a folder of Maid's
+              own. Use it for changes that span projects.</li>
+            <li><b>Shared info</b> <span class="help-tag">Edit</span> is one text that Maid keeps in the
+              <code>CLAUDE.md</code> of every listed project, and of each one added later.</li>
+            <li>Sessions can drive Maid as well: <code>maidctl help</code> in one of them lists what they can do (start,
+              ask and watch the other sessions).</li>
+          </ul>
+        </section>
+      </div>
+
+      <section class="help-warn">
+        <h3>What Maid does on your PC, so you know</h3>
+        <ul>
+          <li>Sessions run <code id="help-command"></code><span data-unless-command="--dangerously-skip-permissions">:
+            Claude Code edits files and runs commands <b>without asking first</b>. Only add folders you are happy to let
+            it work in freely</span>.</li>
+          <li data-setting="runAsAdmin">Maid runs as administrator, and so do its sessions: Windows asks for permission
+            when Maid starts.</li>
+          <li data-setting="autoTrust">Claude Code's "trust this folder?" question is answered Yes for you: you chose the
+            folder by adding it.</li>
+          <li data-setting="saveHistory">When a session stops, the conversation (your prompts and Claude's replies, no tool
+            output) is saved into the project's <code>CLAUDE.md</code>, in a marked section of Maid's own, so the next
+            session knows what happened.</li>
+          <li>Every listed project gets an <code>AGENTS.md</code> with the same text as its <code>CLAUDE.md</code> (other
+            coding agents read that one). An <code>AGENTS.md</code> that said something else is kept as
+            <code>AGENTS.maid-original.md</code>.</li>
+        </ul>
+        <p>To change any of this, close Maid and edit <code id="help-state" class="help-path"></code>:
+          <code>"command"</code>, <code>"runAsAdmin"</code>, <code>"autoTrust"</code>, <code>"saveHistory"</code>.</p>
+      </section>
+
+      <section>
+        <h3>Keyboard</h3>
+        <dl class="help-keys">
+          <dt><kbd>F1</kbd></dt><dd>This help</dd>
+          <dt><kbd>Ctrl</kbd><kbd>Tab</kbd></dt><dd>Next tile (with Shift: the one before)</dd>
+          <dt><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>E</kbd></dt><dd>Edit on / off</dd>
+          <dt><kbd>Ctrl</kbd><kbd>1</kbd>–<kbd>9</kbd></dt><dd>Go to tile 1 to 9</dd>
+          <dt><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>N</kbd></dt><dd>Add a project</dd>
+          <dt><kbd>F11</kbd></dt><dd>Maximize or restore the tile (or double-click its header)</dd>
+          <dt><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>B</kbd></dt><dd>Show or hide the list</dd>
+          <dt><kbd>Ctrl</kbd><kbd>+</kbd><kbd>−</kbd><kbd>0</kbd></dt><dd>Terminal text: larger, smaller, usual</dd>
+          <dt><kbd>Shift</kbd><kbd>Enter</kbd></dt><dd>A new line in Claude's prompt</dd>
+          <dt><kbd>Ctrl</kbd><kbd>C</kbd> <kbd>Ctrl</kbd><kbd>V</kbd></dt><dd>Copy the selection, paste (right-click does both)</dd>
+        </dl>
+      </section>
+    </div>
+
+    <div class="dialog-actions">
+      <span id="help-foot"></span>
+      <button type="button" id="help-close" class="accent">Got it</button>
+    </div>
+  </dialog>
+
+  <script src="lib/xterm.js"></script>
+  <script src="lib/addon-fit.js"></script>
+  <script src="lib/addon-webgl.js"></script>
+  <script src="lib/addon-unicode11.js"></script>
+  <script src="lib/addon-web-links.js"></script>
+  <script src="termcolor.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

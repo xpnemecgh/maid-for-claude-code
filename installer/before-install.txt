@@ -1,0 +1,20 @@
+Maid: all your Claude Code sessions in one window
+
+Maid lists your project folders and runs Claude Code in them, each session in a terminal tile of its own, side by side in one window. Press F1 in Maid for a short tour.
+
+BEFORE YOU START
+
+- Maid runs Claude Code (https://claude.com/claude-code) in its sessions. Install it and sign in once (run "claude" in a terminal) before you start sessions in Maid.
+- Windows 10 (version 1809 or later) or Windows 11, 64-bit. Maid's window needs the Microsoft Edge WebView2 Runtime, which comes with Windows 11; Setup downloads and installs it where it is missing.
+
+WHAT MAID DOES ON YOUR PC, SO YOU KNOW
+
+- Sessions run "claude --dangerously-skip-permissions": Claude Code edits files and runs commands without asking first. Only add folders you are happy to let it work in freely.
+- Maid runs as administrator, and so do its sessions: Windows asks for permission each time Maid starts.
+- Claude Code's "trust this folder?" question is answered Yes for you (you chose the folder by adding it).
+- When a session stops, its conversation (your prompts and Claude's replies) is saved into the project's CLAUDE.md, in a marked section of Maid's own, so the next session knows what happened.
+- Every listed project gets an AGENTS.md with the same text as its CLAUDE.md. An AGENTS.md that said something else is kept as AGENTS.maid-original.md.
+
+Each of these can be changed in %APPDATA%\Maid\state.json while Maid is closed ("command", "runAsAdmin", "autoTrust", "saveHistory"). Uninstalling Maid leaves that folder (your list and settings) in place.
+
+Maid is a personal project, shared as it is, without warranty of any kind.

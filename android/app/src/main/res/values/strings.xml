@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Maid</string>
+    <string name="channel_connection">Connection to the PC</string>
+    <string name="channel_connection_text">Shown while the app keeps the connection to Maid open</string>
+    <string name="disconnect">Disconnect</string>
+    <string name="unlock_title">Unlock Maid</string>
+    <string name="unlock_subtitle">The sessions on your PC</string>
+</resources>

@@ -1,0 +1,5 @@
+<Application x:Class="Maid.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- No StartupUri: App.OnStartup may restart Maid elevated instead of showing the window. -->
+</Application>

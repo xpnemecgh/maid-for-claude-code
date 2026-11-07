@@ -1,0 +1,66 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Maid</RootNamespace>
+    <AssemblyName>Maid</AssemblyName>
+    <!-- Shown in the window title: raise it with every release (the phone app's is versionName in android/app/build.gradle.kts). -->
+    <Version>1.6</Version>
+    <Product>Maid</Product>
+    <Description>Master dashboard for Claude Code sessions</Description>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\maid.ico</ApplicationIcon>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4191.47" />
+    <PackageReference Include="QRCoder" Version="1.6.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Maid.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- maidctl, the API's command line, is built along (not referenced: it only talks to Maid through its pipe). -->
+    <!-- Always built framework-dependent (a self-contained publish of Maid gets its own maidctl below). -->
+    <ProjectReference Include="..\MaidCtl\MaidCtl.csproj" ReferenceOutputAssembly="false" Private="false"
+                      GlobalPropertiesToRemove="RuntimeIdentifier;SelfContained" />
+  </ItemGroup>
+
+  <!-- maidctl goes into cli\ next to Maid.exe, in the build and in the published app: Maid puts that folder first on its
+       sessions' PATH (only maidctl is in there, so nothing else of Maid's shadows what the sessions run). -->
+  <PropertyGroup>
+    <MaidCtlProject>$(MSBuildThisFileDirectory)..\MaidCtl\MaidCtl.csproj</MaidCtlProject>
+    <MaidCtlOutput>$(MSBuildThisFileDirectory)..\MaidCtl\bin\$(Configuration)\net9.0\</MaidCtlOutput>
+  </PropertyGroup>
+  <ItemGroup>
+    <MaidCtlFile Include="$(MaidCtlOutput)maidctl.exe;$(MaidCtlOutput)maidctl.dll;$(MaidCtlOutput)maidctl.runtimeconfig.json;$(MaidCtlOutput)maidctl.deps.json" />
+  </ItemGroup>
+  <Target Name="CopyMaidCtl" AfterTargets="Build">
+    <Copy SourceFiles="@(MaidCtlFile)" DestinationFolder="$(OutDir)cli" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="PublishMaidCtl" AfterTargets="Publish" Condition="'$(SelfContained)' != 'true'">
+    <Copy SourceFiles="@(MaidCtlFile)" DestinationFolder="$(PublishDir)cli" />
+  </Target>
+  <!-- A self-contained Maid (the installer's, tools\build-installer.ps1) runs where .NET may not be installed, so its maidctl
+       is one self-contained, trimmed exe. A separate publish: it restores maidctl for the runtime and the trimmer itself. -->
+  <Target Name="PublishMaidCtlSelfContained" AfterTargets="Publish" Condition="'$(SelfContained)' == 'true'">
+    <PropertyGroup>
+      <MaidCtlPublishDir>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(PublishDir)', 'cli'))</MaidCtlPublishDir>
+    </PropertyGroup>
+    <Exec Command="dotnet publish &quot;$(MaidCtlProject)&quot; -c $(Configuration) -r $(RuntimeIdentifier) --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true -p:DebugType=None -p:DebugSymbols=false -o &quot;$(MaidCtlPublishDir.TrimEnd('\'))&quot;" />
+  </Target>
+
+  <ItemGroup>
+    <!-- The dashboard UI (HTML/JS + vendored xterm.js) is served to WebView2 from this folder. -->
+    <Content Include="wwwroot\**" CopyToOutputDirectory="PreserveNewest" />
+    <Resource Include="Assets\maid.ico" />
+  </ItemGroup>
+
+</Project>
