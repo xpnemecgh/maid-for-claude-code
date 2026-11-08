@@ -52,15 +52,6 @@ internal sealed class Settings
     /// <summary>Run Maid, and so every session, as administrator (<see cref="Elevation"/>). Read at start.</summary>
     public bool RunAsAdmin { get; set; } = true;
     /// <summary>
-    /// The ElevenLabs API key that puts the phone's dictation into words (<see cref="ElevenLabs"/>); empty takes
-    /// the ELEVENLABS_API_KEY environment variable. Never sent to the page or the phone.
-    /// </summary>
-    public string ElevenLabsApiKey { get; set; } = "";
-    /// <summary>ElevenLabs' speech-to-text model for the dictation.</summary>
-    public string TranscriptionModel { get; set; } = ElevenLabs.DefaultModel;
-    /// <summary>The language dictated (ISO 639, e.g. "cs" or "en"); empty: told apart for each recording.</summary>
-    public string DictationLanguage { get; set; } = "";
-    /// <summary>
     /// The local named pipe a push-to-talk program at this PC hands spoken requests to
     /// (<see cref="Remote.LocalPipeServer"/>); empty: none. Read at start.
     /// </summary>
@@ -71,8 +62,7 @@ internal sealed class Settings
     /// </summary>
     public string ApiPipe { get; set; } = Remote.LocalPipeServer.ApiName;
     /// <summary>
-    /// Added to <see cref="Command"/> for the voice tile, which takes the spoken requests of push-to-talk at this PC and
-    /// of a voice assistant on the phone.
+    /// Added to <see cref="Command"/> for the voice tile, which takes the spoken requests of push-to-talk at this PC.
     /// </summary>
     public string VoiceArguments { get; set; } = DefaultVoiceArguments;
 
@@ -84,38 +74,6 @@ internal sealed class Settings
     /// for "the default" and replaced by <see cref="DefaultVoiceArguments"/>; anything else is the user's own.
     /// </summary>
     public static readonly string[] FormerVoiceArguments = ["--model sonnet --effort medium"];
-}
-
-/// <summary>Remote control from the phone app (<see cref="Remote.RemoteServer"/>).</summary>
-internal sealed class RemoteSettings
-{
-    /// <summary>Whether Maid listens for the phone at all; it does so only on its Tailscale addresses.</summary>
-    public bool Enabled { get; set; }
-    public int Port { get; set; } = Remote.RemoteServer.DefaultPort;
-    /// <summary>The one phone that may connect; null when none is paired.</summary>
-    public PairedPhone? Phone { get; set; }
-    /// <summary>
-    /// Tests only, set by hand in state.json: also listen on 127.0.0.1 and take connections from there
-    /// without asking Tailscale who they are (an emulator reaches the PC that way). The phone's key is
-    /// still required.
-    /// </summary>
-    public bool AllowLoopback { get; set; }
-    /// <summary>tailscale.exe; empty to look for it on PATH and in Program Files.</summary>
-    public string TailscalePath { get; set; } = "";
-}
-
-internal sealed class PairedPhone
-{
-    /// <summary>The device's name as the app reports it (e.g. "Pixel 8").</summary>
-    public string Name { get; set; } = "";
-    /// <summary>The phone's public key (EC P-256, SubjectPublicKeyInfo, base64); its private key never leaves the phone.</summary>
-    public string PublicKey { get; set; } = "";
-    /// <summary>Tailscale's stable id of the phone; connections from any other device are refused. Empty for a loopback (test) pairing.</summary>
-    public string NodeId { get; set; } = "";
-    /// <summary>The phone's name in the tailnet, e.g. "pixel-8.tail1234.ts.net".</summary>
-    public string NodeName { get; set; } = "";
-    public DateTime PairedUtc { get; set; }
-    public DateTime? LastSeenUtc { get; set; }
 }
 
 internal sealed class WindowPlacement
@@ -134,7 +92,6 @@ internal sealed class AppState
     public Settings Settings { get; set; } = new();
     /// <summary>The text Maid keeps in the CLAUDE.md of every entry (<see cref="Maid.SharedInfo"/>); empty for none.</summary>
     public string SharedInfo { get; set; } = "";
-    public RemoteSettings Remote { get; set; } = new();
     public WindowPlacement? Window { get; set; }
 }
 
@@ -299,10 +256,6 @@ internal sealed class StateStore
         State.Settings.VoiceArguments ??= Settings.DefaultVoiceArguments;
         if (Settings.FormerVoiceArguments.Contains(State.Settings.VoiceArguments.Trim()))
             State.Settings.VoiceArguments = Settings.DefaultVoiceArguments;
-        State.Remote ??= new RemoteSettings();
-        State.Remote.TailscalePath ??= "";
-        if (State.Remote.Port is < 1024 or > 65535) State.Remote.Port = Remote.RemoteServer.DefaultPort;
-        if (State.Remote.Phone is { } phone && string.IsNullOrWhiteSpace(phone.PublicKey)) State.Remote.Phone = null;
     }
 
     public void Save()

@@ -48,23 +48,15 @@ internal sealed partial class Dashboard
         public bool FlushScheduled { get; set; }
         /// <summary>Completes once the process is gone and its conversation has been saved.</summary>
         public TaskCompletionSource Finished { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-        /// <summary>Recent output, for the phone when it starts watching.</summary>
-        public Remote.TerminalReplay Replay { get; } = new(cols, rows);
-        /// <summary>The console's size now, and the sizes the page's tile and the phone would like.</summary>
+        /// <summary>The console's size now.</summary>
         public int Cols { get; set; } = cols;
         public int Rows { get; set; } = rows;
-        public int DesktopCols { get; set; } = cols;
-        public int DesktopRows { get; set; } = rows;
-        public int PhoneCols { get; set; } = cols;
-        public int PhoneRows { get; set; } = rows;
-        /// <summary>The phone shows this session and it is sized for the phone (until somebody types at the PC).</summary>
-        public bool PhoneOwns { get; set; }
         /// <summary>This session's path on the hook server (Claude Code only); null when it runs without hooks.</summary>
         public string? HookToken { get; set; }
         public string? HookSettingsFile { get; set; }
-        /// <summary>Jarvis's own tile in All projects, where spoken requests (phone and PC) go.</summary>
+        /// <summary>Jarvis's own tile in All projects, where spoken requests go.</summary>
         public bool Jarvis { get; set; }
-        /// <summary>Voice requests typed into this session whose answer the phone or a voice pipe client is waiting for.</summary>
+        /// <summary>Voice requests typed into this session whose answer the voice client that asked is waiting for.</summary>
         public List<VoiceAsker> VoiceRefs { get; } = [];
 
         // What the API tells about it (Dashboard.Api.cs): from Claude Code's hooks, or without hooks from the page's tiles.
@@ -127,7 +119,6 @@ internal sealed partial class Dashboard
             case "ready":
                 SendInit();
                 StartHub();
-                PostRemoteStatus();
                 break;
             case "browse":
                 var purpose = GetString(message, "purpose");
@@ -193,24 +184,14 @@ internal sealed partial class Dashboard
                     target.Pty?.Write(GetString(message, "data"));
                 break;
             case "resize":
-                // While the phone has the session, the tile's size waits until it is the PC's turn again.
                 if (_sessions.TryGetValue(GetString(message, "id"), out var resized))
-                {
-                    (resized.DesktopCols, resized.DesktopRows) = (Math.Clamp(GetInt(message, "cols", 120), 2, 1000), Math.Clamp(GetInt(message, "rows", 30), 1, 500));
-                    if (!resized.PhoneOwns) ApplySize(resized, notifyPage: false);
-                }
-                break;
-            case "claim":
-                OnClaim(GetString(message, "id"));
+                    ResizeTile(resized, Math.Clamp(GetInt(message, "cols", 120), 2, 1000), Math.Clamp(GetInt(message, "rows", 30), 1, 500));
                 break;
             case "tiles":
                 OnTiles(message);
                 break;
             case "remoteResult":
                 OnRemoteResult(message);
-                break;
-            case "remoteSetup":
-                HandleRemoteSetup(GetString(message, "op"));
                 break;
             case "kill":
                 if (_sessions.TryGetValue(GetString(message, "id"), out var killed))
@@ -573,7 +554,6 @@ internal sealed partial class Dashboard
         Grouping.Reconcile(_store.State);
         _store.Save();
         Post(new { type = "list", entries = _store.State.Entries, groups = _store.State.Groups });
-        SendListToPhone();
     }
 
     private void ListFailed(string message) => Post(new { type = "listFailed", message });
@@ -666,13 +646,10 @@ internal sealed partial class Dashboard
         }
 
         _sessions[id] = session;
-        _endedReplays.Remove(id);
         _endedSessions.Remove(id);
         _launchFailures.Remove(id);
         PostAll(new { type = "started", id, entry = entryId, run = session.Run, pid = session.Pty.ProcessId, command,
             hooks = session.HookToken is not null, jarvis });
-        // The phone watching this tile sees the new session from its start, at its own size.
-        if (_phoneViewing == id) PhoneView(id, session.PhoneCols, session.PhoneRows);
     }
 
     private void LaunchFailed(string id, string message)
@@ -984,7 +961,6 @@ internal sealed partial class Dashboard
             SharedInfo.Apply(removed.Path, null);
         }
         Post(new { type = "entryRemoved", id });
-        SendListToPhone();
     }
 
     /// <summary>The session list's width limits, as the page enforces them while it's dragged.</summary>
@@ -1033,10 +1009,7 @@ internal sealed partial class Dashboard
             Monitor.PulseAll(session.Pending);
         }
         if (data.Length == 0) return;
-        session.Replay.Append(data);
         Post(new { type = "output", id = session.Id, run = session.Run, data });
-        if (_phone is { } phone && _phoneViewing == session.Id)
-            phone.Send(Serialize(new { type = "output", id = session.Id, run = session.Run, data }));
     }
 
     /// <summary>Runs on the session's wait thread, whichever way the session ended.</summary>
@@ -1060,8 +1033,7 @@ internal sealed partial class Dashboard
             if (_sessions.TryGetValue(session.Id, out var current) && ReferenceEquals(current, session))
             {
                 _sessions.Remove(session.Id);
-                // The tile stays on the page with its last screen; the phone can still look at it.
-                _endedReplays[session.Id] = session.Replay;
+                // The tile stays on the page with its last screen.
                 _endedSessions[session.Id] = session;
             }
             EvaluateWaiters(session, ended: true);
@@ -1092,12 +1064,19 @@ internal sealed partial class Dashboard
         _apiTimer?.Stop();
         _hubFileTimer?.Stop();
         _hub.Dispose();
-        DisableRemote();
         var finishing = _sessions.Values.Where(session => session.Pty is not null).Select(session => session.Finished.Task).ToArray();
         foreach (var session in _sessions.Values)
             session.Pty?.Kill();
         _sessions.Clear();
         Task.WaitAll(finishing, TimeSpan.FromSeconds(12));
+    }
+
+    /// <summary>The page's tile changed size, and so does its console.</summary>
+    private void ResizeTile(RunningSession session, int cols, int rows)
+    {
+        if (cols == session.Cols && rows == session.Rows) return;
+        (session.Cols, session.Rows) = (cols, rows);
+        session.Pty?.Resize(cols, rows);
     }
 
     // ---- helpers ------------------------------------------------------------------------------------
@@ -1108,6 +1087,36 @@ internal sealed partial class Dashboard
         // notifications have nowhere to go then.
         if (!_shutDown)
             _postJson(JsonSerializer.Serialize(message, JsonOptions));
+    }
+
+    /// <summary>Messages every listener has to hear: sessions starting and ending.</summary>
+    private void PostAll(object message)
+    {
+        Post(message);
+    }
+
+    private static string Serialize(object message) => JsonSerializer.Serialize(message, JsonOptions);
+
+    /// <summary>A reference or id from outside, cut to a sensible length.</summary>
+    private static string Bounded(string text) => text.Length > 64 ? text[..64] : text;
+
+    private const long MaxRemoteLogFile = 512 * 1024;
+
+    /// <summary>The log of Maid's ways in from other programs (the local pipes), <c>remote.log</c> in the data folder.</summary>
+    private void RemoteLog(string text)
+    {
+        var now = DateTime.UtcNow;
+        try
+        {
+            var file = Path.Combine(_store.DataDirectory, "remote.log");
+            if (File.Exists(file) && new FileInfo(file).Length > MaxRemoteLogFile)
+            {
+                var lines = File.ReadAllLines(file);
+                File.WriteAllLines(file, lines.Skip(lines.Length / 2));
+            }
+            File.AppendAllText(file, $"{now.ToLocalTime():yyyy-MM-dd HH:mm:ss}  {text}{Environment.NewLine}");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
     }
 
     private static string? NormalizePath(string raw)

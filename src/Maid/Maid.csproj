@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>Maid</RootNamespace>
     <AssemblyName>Maid</AssemblyName>
-    <!-- Shown in the window title: raise it with every release (the phone app's is versionName in android/app/build.gradle.kts). -->
+    <!-- Shown in the window title: raise it with every release. -->
     <Version>1.6</Version>
     <Product>Maid</Product>
     <Description>Master dashboard for Claude Code sessions</Description>
@@ -19,7 +19,6 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4191.47" />
-    <PackageReference Include="QRCoder" Version="1.6.0" />
   </ItemGroup>
 
   <ItemGroup>

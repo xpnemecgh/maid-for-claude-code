@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- TLS only. The connection to Maid does not rely on these trust anchors: it pins Maid's own certificate. -->
-<network-security-config>
-    <base-config cleartextTrafficPermitted="false" />
-</network-security-config>

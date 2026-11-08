@@ -368,7 +368,7 @@ public sealed class ApiTests : IDisposable
         Send(new { type = "remoteResult", @ref = Text(PageAsked("stop"), "ref"), id = "t1", error = "" });
         Ok(Await(stopped));
 
-        // Typing reaches the console, and the page hears about it as it does for the phone.
+        // Typing reaches the console, and the page hears about it (as good as typing at the tile).
         int mark = _posted.Count;
         Ok(Await(client.Request(new { op = "type", window = "t1", text = "echo typed through the API", enter = true })));
         WaitForPage("output", message => Text(message, "data").Contains("typed through the API"), mark);
@@ -376,7 +376,7 @@ public sealed class ApiTests : IDisposable
     }
 
     [Fact]
-    public void Projects_can_be_added_through_the_pipe_but_not_from_the_phone()
+    public void Projects_can_be_added_through_the_pipe()
     {
         using var client = new Client(_pipe);
         var added = Ok(Await(client.Request(new { op = "addProject", path = Path.Combine(_root, "new one"), group = "Fresh" })));
@@ -385,15 +385,6 @@ public sealed class ApiTests : IDisposable
         Assert.Contains(_store.State.Entries, entry => entry.Name == "new one" && entry.Group == "Fresh");
         Assert.False(Ok(Await(client.Request(new { op = "addProject", path = Path.Combine(_root, "new one") }))).GetProperty("added").GetBoolean());
         Assert.Contains("not found", Error(Await(client.Request(new { op = "addProject", path = Path.Combine(_root, "missing") }))));
-
-        // The phone does what its buttons do; it does not change the list.
-        var answers = new List<(bool Ok, string? Error)>();
-        var phone = new Dashboard.ApiCaller("phone", phone: true, (_, ok, _, error) => answers.Add((ok, error)), () => false);
-        _dashboard.HandleApi(phone, JsonSerializer.Serialize(new { id = "p1", op = "addProject", path = Path.Combine(_root, "other") }));
-        _dashboard.HandleApi(phone, JsonSerializer.Serialize(new { id = "p2", op = "projects" }));
-        Assert.False(answers[0].Ok);
-        Assert.Contains("phone", answers[0].Error);
-        Assert.True(answers[1].Ok);
     }
 
     [Theory]

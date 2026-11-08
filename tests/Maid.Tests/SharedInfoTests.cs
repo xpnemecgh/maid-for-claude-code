@@ -269,7 +269,6 @@ public sealed class DashboardSharedInfoTests : IDisposable
 
         Send(new { type = "ready" });
 
-        // (The phone app's status follows it.)
         var init = _posted.Last(document => document.RootElement.GetProperty("type").GetString() == "init").RootElement;
         Assert.Equal("hello", init.GetProperty("sharedInfo").GetString());
     }

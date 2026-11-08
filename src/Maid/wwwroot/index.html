@@ -61,12 +61,6 @@
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 2.5h9v11h-9z"/><path d="M5.8 5.6h4.4M5.8 8h4.4M5.8 10.4h2.6"/></svg>
         <span class="label">Shared info</span>
       </button>
-      <button type="button" id="phone-btn" class="toggle-btn"
-              title="Phone app: watch and run these sessions from your Android phone, through Tailscale">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="4.25" y="1.75" width="7.5" height="12.5" rx="1.6"/><path d="M7 11.9h2"/></svg>
-        <span class="label">Phone</span>
-        <span class="dot" aria-hidden="true"></span>
-      </button>
       <button type="button" id="edit-toggle" class="toggle-btn" aria-pressed="false"
               title="Edit the project list: add, rename, reorder, group or remove projects (Ctrl+Shift+E). Off whenever Maid starts.">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m11.1 2.6 2.3 2.3-8.1 8.1-3 .7.7-3z"/><path d="m9.6 4.1 2.3 2.3"/></svg>
@@ -170,40 +164,6 @@
     <div class="dialog-actions">
       <button type="button" id="rename-cancel">Cancel</button>
       <button type="button" id="rename-ok" class="accent" title="Rename (Enter)">Rename</button>
-    </div>
-  </dialog>
-
-  <dialog id="phone-dialog" class="dialog wide" aria-labelledby="phone-title">
-    <h2 id="phone-title">Phone</h2>
-    <p>The Maid app on your Android phone shows these sessions one at a time: watch them, type or dictate into them, start
-      and stop them. It reaches this PC only through <b>Tailscale</b>, and only the phone paired here gets in (it
-      proves itself with a key that never leaves the phone).</p>
-    <label class="dialog-check">
-      <input type="checkbox" id="phone-enabled">
-      <span>Let the paired phone connect</span>
-    </label>
-    <div id="phone-state"></div>
-    <div id="phone-pairing" hidden>
-      <img id="phone-qr" alt="Pairing code for the Maid app">
-      <div>
-        <ol>
-          <li>On the phone, install <b>Tailscale</b> and sign in with the same account as this PC.</li>
-          <li>Open the <b>Maid</b> app and tap <b>Scan pairing code</b>.</li>
-          <li>Point the phone at this code.</li>
-        </ol>
-        <p id="phone-expiry"></p>
-        <button type="button" id="phone-copy-link" class="link-btn"
-                title="For a phone that cannot scan: get the link to it and paste it in the app">Copy the pairing link instead</button>
-      </div>
-    </div>
-    <details id="phone-log-box" hidden>
-      <summary>Recent connections</summary>
-      <ul id="phone-log"></ul>
-    </details>
-    <div class="dialog-actions">
-      <button type="button" id="phone-forget" class="quiet-danger" hidden>Forget this phone</button>
-      <button type="button" id="phone-pair">Pair a phone…</button>
-      <button type="button" id="phone-close" class="accent">Done</button>
     </div>
   </dialog>
 

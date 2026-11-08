@@ -9,19 +9,17 @@ using Maid.Terminal;
 namespace Maid;
 
 /// <summary>
-/// Maid's API: Claude Code (in any of Maid's sessions, through <c>maidctl</c>), other programs of the user's at this PC,
-/// and a voice assistant on the phone (through the phone app) control Maid with it. They list the projects and windows, start,
-/// stop and close sessions, type into them, read their screens, and hand a session a prompt and wait for its answer.
+/// Maid's API: Claude Code (in any of Maid's sessions, through <c>maidctl</c>) and other programs of the user's at this
+/// PC control Maid with it. They list the projects and windows, start, stop and close sessions, type into them, read
+/// their screens, and hand a session a prompt and wait for its answer.
 ///
-/// Two ways in, both existing ones: the local API pipe (<see cref="Settings.ApiPipe"/>, guarded like the voice pipe:
-/// only the user's programs, and only elevated ones while Maid is elevated; nothing from the network), and the phone's
-/// link (message <c>api</c>), which only the paired phone gets through. The phone may do what its own buttons do,
-/// not change Maid's list.
+/// The way in is the local API pipe (<see cref="Settings.ApiPipe"/>, guarded like the voice pipe: only the user's
+/// programs, and only elevated ones while Maid is elevated; nothing from the network).
 ///
-/// A request is <c>{ id, op, …arguments }</c>, its answer <c>{ id, ok: true, result }</c> or <c>{ id, ok: false, error }</c>
-/// (on the phone's link wrapped as <c>api { ref, request }</c> → <c>apiResult { ref, ok, result, error }</c>). The tiles are
-/// the page's, so what changes them goes through the page (<c>remote</c> → <c>remoteResult</c>), like the phone's buttons;
-/// whether a Claude Code session works, waits for an answer, or is done, and what it answered, comes from its hooks.
+/// A request is <c>{ id, op, …arguments }</c>, its answer <c>{ id, ok: true, result }</c> or <c>{ id, ok: false, error }</c>.
+/// The tiles are the page's, so what changes them goes through the page (<c>remote</c> → <c>remoteResult</c>), as if
+/// its buttons had been clicked; whether a Claude Code session works, waits for an answer, or is done, and what it
+/// answered, comes from its hooks.
 /// </summary>
 internal sealed partial class Dashboard
 {
@@ -53,15 +51,18 @@ internal sealed partial class Dashboard
     /// <summary>The API pipe's name while Maid listens on it; null otherwise (tests, or a name another program holds).</summary>
     internal string? ApiPipeName => _apiPipe?.Name;
 
-    /// <summary>Someone using the API: a program on the API pipe, or Jarvis by way of the phone app.</summary>
-    internal sealed class ApiCaller(string name, bool phone, Action<string, bool, object?, string?> reply, Func<bool> closed)
+    /// <summary>Someone using the API: a program on the API pipe.</summary>
+    internal sealed class ApiCaller(string name, Action<string, bool, object?, string?> reply, Func<bool> closed)
     {
         public string Name { get; } = name;
-        /// <summary>The phone may do what its own buttons do, not change Maid's list.</summary>
-        public bool Phone { get; } = phone;
         /// <summary>Sends an answer: (request id, ok, result, error).</summary>
         public Action<string, bool, object?, string?> Reply { get; } = reply;
         public Func<bool> IsClosed { get; } = closed;
+
+        /// <summary>The same caller, answered through <paramref name="reply"/> instead.</summary>
+        public ApiCaller WithReply(Action<string, bool, object?, string?> reply) => new(Name, reply, IsClosed)
+        {
+        };
     }
 
     /// <summary>One request: its answer goes back to its caller under its id, once.</summary>
@@ -113,7 +114,7 @@ internal sealed partial class Dashboard
         if (_shutDown || client.IsClosed) return;
         if (!_apiClients.TryGetValue(client, out var caller))
         {
-            caller = new ApiCaller($"pipe {client.Number}", phone: false,
+            caller = new ApiCaller($"pipe {client.Number}",
                 (id, ok, result, error) => client.Send(Serialize(new { id, ok, result, error })), () => client.IsClosed);
             _apiClients[client] = caller;
         }
@@ -125,23 +126,6 @@ internal sealed partial class Dashboard
         if (!_apiClients.Remove(client, out var caller)) return;
         foreach (var session in _sessions.Values) session.Waiters.RemoveAll(waiter => waiter.Request.Caller == caller);
     }
-
-    /// <summary>The phone app passes on a request of Jarvis's (or another app on the phone it lets in).</summary>
-    private void PhoneApi(string reference, JsonElement message)
-    {
-        if (reference.Length == 0) return;
-        if (!message.TryGetProperty("request", out var request) || request.ValueKind != JsonValueKind.Object)
-        {
-            _phone?.Send(Serialize(new { type = "apiResult", @ref = reference, ok = false, result = (object?)null, error = "No request." }));
-            return;
-        }
-        // Answers go to whichever connection the phone has by then: the app waits for them under its ref.
-        _phoneCaller ??= new ApiCaller("phone", phone: true,
-            (id, ok, result, error) => _phone?.Send(Serialize(new { type = "apiResult", @ref = id, ok, result, error })), () => false);
-        HandleApi(_phoneCaller, request.Clone(), reference);
-    }
-
-    private ApiCaller? _phoneCaller;
 
     // ---- requests ---------------------------------------------------------------------------------------------
 
@@ -257,13 +241,6 @@ internal sealed partial class Dashboard
                 running = tiles.Count(tile => tile.Status == "running"),
                 working = states.Count(state => state == "working"),
                 asking = states.Count(state => state == "asking"),
-            },
-            phone = new
-            {
-                enabled = RemoteSettings.Enabled,
-                paired = RemoteSettings.Phone?.Name,
-                connected = _phone is not null,
-                viewing = _phone is not null && _phoneViewing is { } viewing ? tiles.FirstOrDefault(tile => tile.Id == viewing)?.Name : null,
             },
             hub = _hub.Directory,
         };
@@ -630,9 +607,8 @@ internal sealed partial class Dashboard
         public ApiRequestForwarder(ApiRequest original, string entry, string text)
         {
             var message = JsonSerializer.SerializeToElement(new { op = "launch", project = entry, text });
-            Request = new ApiRequest(new ApiCaller(original.Caller.Name, original.Caller.Phone,
-                (id, ok, result, error) => { if (!ok) Fail(original, error ?? "The session did not start."); },
-                original.Caller.IsClosed), original.Id, message);
+            Request = new ApiRequest(original.Caller.WithReply(
+                (id, ok, result, error) => { if (!ok) Fail(original, error ?? "The session did not start."); }), original.Id, message);
         }
     }
 
@@ -742,7 +718,7 @@ internal sealed partial class Dashboard
         var multiline = text.Contains('\n') || text.Contains('\r');
         var data = multiline ? "\u001b[200~" + text.Replace("\r\n", "\r").Replace('\n', '\r') + "\u001b[201~" : text;
         if (data.Length > 0) session.Pty?.Write(data);
-        // Typed in like the phone does: prompts are answered, "waiting" is over.
+        // As good as typing at the tile: prompts are answered, "waiting" is over.
         session.Asking = "";
         session.AskingInput = null;
         session.AskingText = null;
@@ -864,6 +840,30 @@ internal sealed partial class Dashboard
 
     // ---- through the page -----------------------------------------------------------------------------------------
 
+    /// <summary>The page's tiles as it last sent them (a JSON array): the windows the API knows.</summary>
+    private JsonElement _tiles = JsonDocument.Parse("[]").RootElement.Clone();
+
+    /// <summary>The page's tiles changed (which there are, in their order, and how their sessions are doing).</summary>
+    private void OnTiles(JsonElement message)
+    {
+        if (!message.TryGetProperty("tiles", out var tiles) || tiles.ValueKind != JsonValueKind.Array) return;
+        _tiles = tiles.Clone();
+        var ids = new HashSet<string>();
+        foreach (var tile in _tiles.EnumerateArray())
+        {
+            if (tile.ValueKind == JsonValueKind.Object && GetString(tile, "id") is { Length: > 0 } tileId) ids.Add(tileId);
+        }
+        TrackTilesForApi(ids);
+    }
+
+    /// <summary>The page did (or could not do) what it was asked to with its tiles (<c>remote</c>).</summary>
+    private void OnRemoteResult(JsonElement message)
+    {
+        string reference = GetString(message, "ref"), id = GetString(message, "id"), error = GetString(message, "error");
+        if (OnApiPageResult(reference, message)) return;
+        if (OnVoicePlaced(reference, id, error)) return;
+    }
+
     /// <summary>Asks the page to do something with its tiles (<c>remote</c>); <paramref name="then"/> gets its <c>remoteResult</c>, or null when it did not answer.</summary>
     private void AskPage(Dictionary<string, object?> fields, Action<JsonElement?> then)
     {
@@ -948,11 +948,6 @@ internal sealed partial class Dashboard
 
     private void ApiAddProject(ApiRequest request)
     {
-        if (request.Caller.Phone)
-        {
-            Fail(request, "The phone can't change Maid's list of projects.");
-            return;
-        }
         var (entry, added, error) = CreateEntry(GetString(request.Message, "path"), GetString(request.Message, "group"));
         if (entry is null)
         {

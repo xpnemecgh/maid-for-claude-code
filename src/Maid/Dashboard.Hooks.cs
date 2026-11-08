@@ -6,16 +6,16 @@ namespace Maid;
 
 /// <summary>
 /// Claude Code's hooks (what a session is doing, for certain) and the voice tile ("Jarvis") in All projects:
-/// spoken requests from a voice assistant app on the phone ("on computer, …", through the phone app) and from a
-/// push-to-talk program at this PC (the voice pipe) go there, and Claude's answer goes back to whichever of them asked.
+/// spoken requests go there (from a push-to-talk program at this PC, through the voice pipe: Dashboard.Voice.cs),
+/// and Claude's answer goes back to whoever asked.
 /// </summary>
 internal sealed partial class Dashboard
 {
     /// <summary>What the voice tile's Claude Code is told on top of its usual instructions.</summary>
     internal const string VoiceInstructions =
         "Requests in this session are spoken by the user and transcribed, so expect recognition errors and interpret them " +
-        "sensibly. They come from a voice assistant on the user's phone or from push-to-talk at this PC. Carry them out " +
-        "on this Windows PC.\n\n" +
+        "sensibly. They come from push-to-talk at this PC, where the user saw the transcript and could cancel it. Carry " +
+        "them out on this Windows PC.\n\n" +
         "Maid, the dashboard this session runs in, is controlled with `maidctl` (`maidctl help` lists the commands). When the " +
         "user asks to start, stop or check on a session, or to have one of their projects do something, use it: for example " +
         "`maidctl windows`, `maidctl ask <project> \"<task>\"` (prints the session's answer, which you then sum up), " +
@@ -30,13 +30,10 @@ internal sealed partial class Dashboard
     internal const int MaxVoiceChars = 2000;
 
     private HookServer? _hookServer;
-    /// <summary>
-    /// Who asked for a voice request and under what reference: the phone (<see cref="Local"/> null, answered
-    /// through whichever phone connection is current) or a program on the voice pipe.
-    /// </summary>
-    private sealed record VoiceAsker(string Ref, Remote.LocalPipeClient? Local);
+    /// <summary>Who asked for a voice request (a program on the voice pipe) and under what reference.</summary>
+    private sealed record VoiceAsker(string Ref, Remote.LocalPipeClient Local);
 
-    /// <summary>Voice requests the page is still placing, by the key the page was given (the phone's ref as it is).</summary>
+    /// <summary>Voice requests the page is still placing, by the key the page was given.</summary>
     private readonly Dictionary<string, VoiceAsker> _voicePlacing = [];
 
     private string HooksDirectory => Path.Combine(_store.DataDirectory, "hooks");
@@ -147,15 +144,11 @@ internal sealed partial class Dashboard
         session.VoiceRefs.Clear();
     }
 
-    /// <summary>To the device that asked: the voice pipe's client, or the phone connected now.</summary>
+    /// <summary>To the program that asked.</summary>
     private void SendVoice(VoiceAsker asker, object message)
     {
-        if (asker.Local is { } local) local.Send(Serialize(message));
-        else _phone?.Send(Serialize(message));
+        asker.Local.Send(Serialize(message));
     }
-
-    /// <summary>The phone passes on a request Jarvis heard: the page puts it into Jarvis's tile.</summary>
-    private void PhoneVoice(string reference, string text) => PlaceVoice(new VoiceAsker(reference, null), reference, text);
 
     /// <summary>
     /// A spoken request for the voice tile: the page puts it there under <paramref name="key"/> (unique among the

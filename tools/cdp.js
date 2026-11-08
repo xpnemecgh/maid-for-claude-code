@@ -24,8 +24,7 @@
 // Tip: app.js/app.css can be copied straight into the build output's wwwroot and picked up with `reload`;
 // running sessions survive the reload and the UI re-attaches to them.
 const fs = require('fs');
-// CDP_PORT / CDP_MATCH pick another target, e.g. the phone app's WebView in an emulator:
-//   adb forward tcp:9444 localabstract:webview_devtools_remote_<pid>; CDP_PORT=9444 CDP_MATCH=appassets
+// CDP_PORT / CDP_MATCH pick another target.
 const PORT = process.env.CDP_PORT || 9333;
 
 const HOOK = `

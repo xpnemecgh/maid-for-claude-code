@@ -21,8 +21,6 @@ mono_crash.*
 
 # Build results
 [Dd]ebug/
-# ...but the phone app's debug-only sources (DebugApiReceiver) are sources
-!android/app/src/debug/
 [Dd]ebugPublic/
 [Rr]elease/
 [Rr]eleases/
@@ -489,12 +487,3 @@ $RECYCLE.BIN/
 dist/
 
 
-# Android app: build output, local SDK path, signing key, bundled copy of the web UI, APK
-android/.gradle/
-android/.kotlin/
-android/build/
-android/app/build/
-android/local.properties
-android/keystore/
-android/app/src/main/assets/www/
-android/dist/

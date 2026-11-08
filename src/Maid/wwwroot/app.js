@@ -13,7 +13,7 @@
 
   /**
    * What xterm.js sends on its own: focus reports (Claude Code asks for them), cursor position, device attributes,
-   * mode and colour replies. They aren't somebody at the PC, so they don't take a terminal's size back from the phone.
+   * mode and colour replies. They aren't somebody at the PC: they go to the session but count as no typing here.
    */
   const TERMINAL_REPORT = /^(?:\x1b\[[IO]|\x1b\[\d+;\d+R|\x1b\[[?>=]?[\d;]*c|\x1b\[\??[\d;]*\$y|\x1b\[[\d;]*t|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1bP[^\x1b]*\x1b\\)+$/;
 
@@ -42,7 +42,7 @@
     { name: 'Sky', value: '#7fcfff' }, { name: 'Blue', value: '#8fb0ff' }, { name: 'Violet', value: '#b9a0ff' },
     { name: 'Pink', value: '#f09be6' }, { name: 'Rose', value: '#ff9dbb' }, { name: 'Sand', value: '#d8c3a5' },
   ];
-  /** The terminal colours and a group colour's tint (termcolor.js, shared with the phone app). */
+  /** The terminal colours and a group colour's tint (termcolor.js). */
   const { THEME, themeFor, tintOutput } = window.MaidTerm;
 
   const ICONS = {
@@ -63,7 +63,6 @@
     color: '<svg viewBox="0 0 16 16"><path d="M8 2.2S3.6 6.7 3.6 9.6a4.4 4.4 0 0 0 8.8 0C12.4 6.7 8 2.2 8 2.2z"/></svg>',
     move: '<svg viewBox="0 0 16 16"><path d="M7.5 12.75H3.25c-.83 0-1.5-.67-1.5-1.5v-7c0-.83.67-1.5 1.5-1.5h2.6l1.5 1.5h5.4c.83 0 1.5.67 1.5 1.5v1.5"/><path d="M9 11h5.5M12.4 8.9l2.1 2.1-2.1 2.1"/></svg>',
     renameFolder: '<svg viewBox="0 0 16 16"><path d="M8.5 12.75H3.25c-.83 0-1.5-.67-1.5-1.5v-7c0-.83.67-1.5 1.5-1.5h2.6l1.5 1.5h5.4c.83 0 1.5.67 1.5 1.5v.5"/><path d="M12.25 7.75v6.5M10.75 7.75h3M10.75 14.25h3"/></svg>',
-    phone: '<svg viewBox="0 0 16 16"><rect x="4.25" y="1.75" width="7.5" height="12.5" rx="1.6"/><path d="M7 11.9h2"/></svg>',
   };
 
   // ---- state ----------------------------------------------------------------------------------
@@ -129,17 +128,6 @@
     renameAffected: $('rename-affected'),
     renameStatus: $('rename-status'),
     renameOk: $('rename-ok'),
-    phoneButton: $('phone-btn'),
-    phoneDialog: $('phone-dialog'),
-    phoneEnabled: $('phone-enabled'),
-    phoneState: $('phone-state'),
-    phonePairing: $('phone-pairing'),
-    phoneQr: $('phone-qr'),
-    phoneExpiry: $('phone-expiry'),
-    phoneLogBox: $('phone-log-box'),
-    phoneLog: $('phone-log'),
-    phonePair: $('phone-pair'),
-    phoneForget: $('phone-forget'),
     stage: $('stage'),
     grid: $('grid'),
     emptyHint: $('empty-hint'),
@@ -232,7 +220,7 @@
     return tree;
   }
   /** A modal dialog has the keyboard; the dashboard's own shortcuts and focus handling stay out of its way. */
-  const modalOpen = () => els.confirm.open || els.infoDialog.open || els.moveDialog.open || els.renameDialog.open || els.phoneDialog.open
+  const modalOpen = () => els.confirm.open || els.infoDialog.open || els.moveDialog.open || els.renameDialog.open
     || els.helpDialog.open;
 
 
@@ -1246,7 +1234,7 @@
     const tile = element('article', 'tile');
     const head = element('header', 'tile-head');
     const jarvisChip = element('span', 'tile-jarvis', 'Jarvis');
-    jarvisChip.title = 'The voice window: spoken requests come here, from a voice assistant on the phone ("On computer, …") or from push-to-talk at the PC';
+    jarvisChip.title = 'The voice window: spoken requests from push-to-talk at the PC come here';
     const detail = element('span', 'tile-detail', entry.path);
     const stateText = element('span', 'tile-state');
     const actions = element('div', 'tile-actions');
@@ -1256,13 +1244,8 @@
       maximizeButton,
       actionButton('close', ICONS.close, 'Close'));
     const nameEl = element('span', 'tile-name', entry.name);
-    // While the phone shows the session, the console has the phone's size; clicking here takes it back.
-    const phoneBadge = element('button', 'tile-phone');
-    phoneBadge.type = 'button';
-    phoneBadge.innerHTML = ICONS.phone;
-    phoneBadge.append('Sized for the phone');
-    phoneBadge.title = "The phone app shows this session, so it has the phone's size. Click (or type here) to give it this tile's size again.";
-    head.append(element('span', 'dot'), nameEl, jarvisChip, detail, phoneBadge, stateText, actions);
+    head.append(element('span', 'dot'), nameEl, jarvisChip, detail);
+    head.append(stateText, actions);
     head.title = entry.path;
     tile.classList.toggle('is-hub', isHub(entry.id));
 
@@ -1304,9 +1287,9 @@
       id, entry, number, term, fit,
       run: 0, status: 'idle', exitCode: null, error: '', stopped: false, historyNote: '', trustWatch: null,
       title: '', busy: false, busySince: 0, lastOutputAt: 0, launchedAt: 0, attention: false,
-      // waiting: done working (or rang) and nobody typed since; unlike attention also while watched here (for the phone)
-      waiting: false, phoneSized: false,
-      // hooked: Claude Code reports through hooks (busy and waiting come from them); jarvis: the phone's voice tile
+      // waiting: done working (or rang) and nobody typed since; unlike attention also while watched here
+      waiting: false,
+      // hooked: Claude Code reports through hooks (busy and waiting come from them); jarvis: the voice tile
       hooked: false, hookSeen: false, jarvis: false, voiceQueue: [],
       stopRequested: false, ctrlVPending: false, fitTimer: 0,
       color: colorOf(entry), tintCarry: '',
@@ -1332,12 +1315,11 @@
     term.onData((data) => {
       if (session.status !== 'running') return;
       // Replies the terminal makes by itself (focus in/out, which Claude Code asks for, cursor position, device
-      // attributes) are not someone at the PC: they go to the session but take nothing from the phone.
+      // attributes) are not someone at the PC: they go to the session but count as no typing here.
       if (TERMINAL_REPORT.test(data)) {
         post({ type: 'input', id: session.id, data });
         return;
       }
-      claimSize(session);
       post({ type: 'input', id: session.id, data });
       clearAttention(session);
       clearWaiting(session);
@@ -1368,7 +1350,6 @@
       // action would move focus off the terminal, so it is suppressed (clicks still fire).
       const inTerminal = !!event.target.closest('.term-host');
       if (!inTerminal) event.preventDefault();
-      if (inTerminal || event.target.closest('.tile-phone')) claimSize(session);
       if (!event.target.closest('button')) activate(session.id, { focus: !inTerminal });
     });
     head.addEventListener('dblclick', (event) => {
@@ -1395,7 +1376,7 @@
     return session;
   }
 
-  /** Jarvis's tile (in All projects): the phone's spoken "on computer" requests go there, and only there. */
+  /** Jarvis's tile (in All projects): spoken requests go there, and only there. */
   function setJarvis(session, on) {
     session.jarvis = on;
     session.el.tile.classList.toggle('is-jarvis', on);
@@ -1437,7 +1418,7 @@
 
     Object.assign(session, {
       status: 'starting', run: 0, exitCode: null, error: '', title: '', stopped: false, historyNote: '',
-      busy: false, attention: false, waiting: false, phoneSized: false, stopRequested: false, launchedAt: performance.now(), tintCarry: '',
+      busy: false, attention: false, waiting: false, stopRequested: false, launchedAt: performance.now(), tintCarry: '',
       hooked: false, hookSeen: false,
       trustWatch: state.settings.autoTrust ? { lastKeyAt: 0, moves: 0 } : null,
     });
@@ -1753,7 +1734,6 @@
       'is-failed': isFailed(session),
       'is-active': state.activeId === id,
       'is-maximized': state.maximizedId === id,
-      'is-phone-sized': running && session.phoneSized,
     };
     for (const [name, on] of Object.entries(flags)) session.el.tile.classList.toggle(name, on);
 
@@ -2063,15 +2043,15 @@
     relayout = requestAnimationFrame(() => { if (!state.settings.columns) layoutGrid(); });
   }).observe(els.stage);
 
-  // ---- the phone app ------------------------------------------------------------------------
+  // ---- the tiles, for the host ---------------------------------------------------------------
 
-  // The phone mirrors the tiles: the host passes on what the page sends here, and the page does what
-  // the phone's buttons ask for (`remote`), as if they had been clicked here.
+  // The host knows the tiles from what the page sends here (Maid's API finds its windows there), and the page
+  // does what the host asks for (`remote`), as if its buttons had been clicked.
 
   let tilesTimer = 0;
   let tilesSent = '';
 
-  /** Tells the host (for the phone) which tiles there are, in their order, and how their sessions are doing. */
+  /** Tells the host which tiles there are, in their order, and how their sessions are doing. */
   function publishTiles() {
     if (tilesTimer) return;
     tilesTimer = setTimeout(() => {
@@ -2097,7 +2077,7 @@
     }, 120);
   }
 
-  /** Done working (or rang the bell) and nobody has typed since: the phone may want to say so. */
+  /** Done working (or rang the bell) and nobody has typed since. */
   function setWaiting(session) {
     if (session.waiting || session.status !== 'running') return;
     session.waiting = true;
@@ -2109,132 +2089,6 @@
     session.waiting = false;
     publishTiles();
   }
-
-  /** Somebody uses the tile here: the console gets the tile's size back from the phone. */
-  function claimSize(session) {
-    if (!session.phoneSized) return;
-    session.phoneSized = false;
-    post({ type: 'claim', id: session.id });
-    refresh(session.id);
-  }
-
-  const phone = { status: null, expiryTimer: 0, copiedAt: 0 };
-
-  function ago(iso) {
-    const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-    if (minutes < 1) return 'just now';
-    if (minutes < 60) return `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
-    const hours = Math.round(minutes / 60);
-    if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-    return `on ${new Date(iso).toLocaleDateString()}`;
-  }
-
-  /** The Phone button (lit while switched on, its dot while the phone is connected) and, when open, the dialog. */
-  function renderPhone() {
-    const status = phone.status;
-    if (!status) return;
-    const paired = status.phone;
-    els.phoneButton.classList.toggle('on', !!status.enabled);
-    els.phoneButton.classList.toggle('is-connected', !!status.connected);
-    els.phoneButton.title = !status.enabled ? 'Phone app: switched off'
-      : status.connected ? `Phone app: ${status.connected.from} is connected`
-      : paired ? `Phone app: ${paired.name} is paired, not connected now` : 'Phone app: no phone paired yet';
-    if (!els.phoneDialog.open) return;
-
-    els.phoneEnabled.checked = !!status.enabled;
-    const lines = [];
-    if (!status.enabled) {
-      lines.push(element('p', '', 'Off: Maid does not listen for the phone.'));
-    } else {
-      if (status.listening.length) {
-        lines.push(element('p', '', `Listening on ${status.listening.join(', ')}${status.tailscale.name ? ` (${status.tailscale.name})` : ''}.`));
-      }
-      if (!status.tailscale.ok) {
-        lines.push(element('p', 'warning', `Tailscale: ${status.tailscale.error || 'not running'}. The phone reaches this PC only through Tailscale.`));
-      }
-      for (const problem of status.problems || []) lines.push(element('p', 'warning', `Could not listen on ${problem}`));
-      if (!status.elevated) {
-        lines.push(element('p', 'warning', 'Maid does not run as administrator, so it could not let the phone in through Windows Firewall.'));
-      }
-    }
-    if (paired) {
-      const where = paired.nodeName ? ` (${paired.nodeName})` : paired.loopback ? ' (a test pairing through this PC)' : '';
-      lines.push(element('p', '', `Paired with ${paired.name}${where}, ${ago(paired.pairedUtc)}.`));
-      lines.push(status.connected
-        ? element('p', 'good', `Connected now, since ${new Date(status.connected.since).toLocaleTimeString()}.`)
-        : element('p', '', paired.lastSeenUtc ? `Last connected ${ago(paired.lastSeenUtc)}.` : 'Not connected yet.'));
-    } else {
-      lines.push(element('p', '', 'No phone is paired.'));
-    }
-    if (status.dictation) {
-      lines.push(status.dictation.available
-        ? element('p', '', `Dictation from the phone is put into words by ElevenLabs, with the API key from ${status.dictation.source === 'settings' ? 'state.json' : 'the ELEVENLABS_API_KEY environment variable'}.`)
-        : element('p', 'warning', 'Dictation from the phone needs an ElevenLabs API key on this PC: set ELEVENLABS_API_KEY (or settings.elevenLabsApiKey in state.json) and start Maid again.'));
-    }
-    els.phoneState.replaceChildren(...lines);
-
-    const pairing = status.pairing;
-    els.phonePairing.hidden = !pairing;
-    clearInterval(phone.expiryTimer);
-    if (pairing) {
-      if (els.phoneQr.getAttribute('src') !== pairing.image) els.phoneQr.src = pairing.image;
-      const tick = () => {
-        if (Date.now() - phone.copiedAt < 4000) return; // "Copied" stays a moment
-        const left = Math.max(0, Math.round((new Date(pairing.expires).getTime() - Date.now()) / 1000));
-        els.phoneExpiry.textContent = left
-          ? `The code works once, for the next ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}.`
-          : 'The code has expired.';
-        if (!left) clearInterval(phone.expiryTimer);
-      };
-      tick();
-      phone.expiryTimer = setInterval(tick, 1000);
-    }
-    els.phonePair.textContent = pairing ? 'Cancel pairing' : paired ? 'Pair another phone…' : 'Pair a phone…';
-    els.phonePair.title = pairing || !paired ? '' : `The new phone replaces ${paired.name}.`;
-    els.phonePair.disabled = !status.enabled;
-    els.phoneForget.hidden = !paired;
-    const log = status.log || [];
-    els.phoneLog.replaceChildren(...log.map((line) => {
-      const item = element('li');
-      item.append(element('time', '', new Date(line.time).toLocaleTimeString()), ` ${line.text}`);
-      return item;
-    }));
-    els.phoneLogBox.hidden = !log.length;
-  }
-
-  function openPhoneDialog() {
-    post({ type: 'remoteSetup', op: 'status' });
-    closeMenu();
-    els.phoneDialog.showModal();
-    renderPhone();
-  }
-
-  els.phoneButton.addEventListener('click', openPhoneDialog);
-  els.phoneEnabled.addEventListener('change', () => post({ type: 'remoteSetup', op: els.phoneEnabled.checked ? 'enable' : 'disable' }));
-  els.phonePair.addEventListener('click', () => post({ type: 'remoteSetup', op: phone.status && phone.status.pairing ? 'cancelPair' : 'pair' }));
-  els.phoneForget.addEventListener('click', async () => {
-    const paired = phone.status && phone.status.phone;
-    if (!paired) return;
-    const sure = await confirmDialog({
-      title: `Forget ${paired.name}?`,
-      note: 'It is disconnected and cannot connect again until it is paired anew.',
-      action: 'Forget',
-    });
-    if (sure) post({ type: 'remoteSetup', op: 'forget' });
-  });
-  $('phone-copy-link').addEventListener('click', () => {
-    if (!phone.status || !phone.status.pairing) return;
-    post({ type: 'copy', text: phone.status.pairing.uri });
-    phone.copiedAt = Date.now();
-    els.phoneExpiry.textContent = 'Copied. Paste it in the app (Paste pairing link instead).';
-  });
-  $('phone-close').addEventListener('click', () => els.phoneDialog.close());
-  els.phoneDialog.addEventListener('close', () => {
-    // A pairing code is only on offer while it is on the screen.
-    if (phone.status && phone.status.pairing) post({ type: 'remoteSetup', op: 'cancelPair' });
-    clearInterval(phone.expiryTimer);
-    setTimeout(refocusTerminal, 0);
-  });
 
   // ---- help ------------------------------------------------------------------------------------
 
@@ -2539,7 +2393,7 @@
         // A session the user stopped ends with a "killed" exit code; that is not a failure.
         Object.assign(session, {
           status: 'exited', exitCode: message.exitCode, stopped: session.stopRequested,
-          busy: false, attention: false, waiting: false, phoneSized: false, stopRequested: false, trustWatch: null,
+          busy: false, attention: false, waiting: false, stopRequested: false, trustWatch: null,
           historyNote: message.historyError ? `The conversation could not be saved to CLAUDE.md: ${message.historyError}`
             : message.historySaved ? 'Conversation saved to CLAUDE.md.'
             : '',
@@ -2551,8 +2405,9 @@
     },
 
     /**
-     * The phone, or the API (maidctl, Jarvis: Dashboard.Api.cs), asks for what a button here does; answered with
-     * remoteResult (the tile used, or why not). The API's requests come `quiet`: they don't take the keyboard.
+     * The host asks for what a button here does, for Maid's API (maidctl: Dashboard.Api.cs) or a voice request;
+     * answered with remoteResult (the tile used, or why not). The API's requests come `quiet`: they don't take the
+     * keyboard.
      */
     remote(message) {
       const reply = (id, error = '', extra = {}) => post({ type: 'remoteResult', ref: message.ref, id: id || '', error, ...extra });
@@ -2645,7 +2500,7 @@
       const first = !session.hookSeen;
       session.hookSeen = true;
       const asking = message.kind === 'AskUserQuestion' || message.kind === 'ExitPlanMode';
-      // Jarvis's tile never waits for anybody here: its answers are read out on the phone.
+      // Jarvis's tile never waits for anybody here: its answers are read out to whoever asked.
       const waits = () => { if (!session.jarvis) { setWaiting(session); raiseAttention(session); } };
       switch (message.event) {
         case 'UserPromptSubmit':
@@ -2675,7 +2530,7 @@
       if (first) flushVoice(session);
     },
 
-    /** The phone typed into a session: as good as typing here, as far as prompts and "waiting" go. */
+    /** Something typed into a session from outside the page (Maid's API): as good as typing here, as far as prompts and "waiting" go. */
     remoteInput(message) {
       const session = state.sessions.get(message.id);
       if (!session) return;
@@ -2683,19 +2538,6 @@
       clearAttention(session);
       clearWaiting(session);
       if (message.escape) checkInterrupted(session);
-    },
-
-    /** Whose size the console has: the tile's, or the phone's (while the phone shows it). */
-    sized(message) {
-      const session = state.sessions.get(message.id);
-      if (!session) return;
-      session.phoneSized = message.owner === 'phone';
-      refresh(session.id);
-    },
-
-    remoteStatus(message) {
-      phone.status = message;
-      renderPhone();
     },
 
     paste(message) {

@@ -1,18 +1,13 @@
 # Maid's API
 
 Maid, the dashboard that runs the user's Claude Code sessions, can be controlled by programs: a Claude
-Code session (through `maidctl`), any other program of the user's at the PC, and a voice assistant app on the
-phone (through the Maid phone app). With it they list the projects and the windows, start, stop and close sessions, type into them,
-read their screens, and give a session a prompt and wait for its answer.
+Code session (through `maidctl`) and any other program of the user's at the PC. With it they list the projects and
+the windows, start, stop and close sessions, type into them, read their screens, and give a session a prompt and
+wait for its answer.
 
-There are two ways in, and both are ways Maid already had:
-
-| Who | Way in | Who gets through |
-|---|---|---|
-| Programs at the PC (`maidctl`, scripts) | the local named pipe `\\.\pipe\Maid.Api` (`settings.apiPipe`, empty = off; read at start) | only the user's own programs, and only elevated ones while Maid runs elevated (as it does by default). Nothing from the network. |
-| A voice assistant app on the phone | the Maid phone app's `JarvisRelay` (Android `Messenger`), then the app's existing link to Maid | only the one app the phone app was built for, checked by its package and signing certificate (none by default); then only the paired phone, over Tailscale and TLS, as always |
-
-The phone may do what its buttons do. It can't change Maid's list of projects (`addProject` is refused).
+The way in is the local named pipe `\\.\pipe\Maid.Api` (`settings.apiPipe`, empty = off; read at start). Only the
+user's own programs get through, and only elevated ones while Maid runs elevated (as it does by default). Nothing
+from the network.
 
 ## maidctl (at the PC)
 
@@ -22,7 +17,7 @@ use the full path, e.g. `C:\Program Files\Maid\cli\maidctl.exe`. The shell must 
 Maid is.
 
 ```
-maidctl status                       Maid, its windows (how many work, ask), the phone
+maidctl status                       Maid and its windows (how many work, ask)
 maidctl projects                     the listed projects by group, with their folders
 maidctl windows                      the open windows: name, state, program, id, last answer
 maidctl screen <window> [--lines N]  the text a window shows (or its last N lines, scrollback included)
@@ -93,7 +88,7 @@ One JSON object per line, in both directions. A request is `{ "id": "<yours>", "
 | op | arguments | result |
 |---|---|---|
 | `hello` | | `app, version, api (1), elevated, window` |
-| `status` | | `version, elevated, projects, windows { open, running, working, asking }, phone { enabled, paired, connected, viewing }, hub` |
+| `status` | | `version, elevated, projects, windows { open, running, working, asking }, hub` |
 | `projects` | | `projects [{ id, name, path, group (e.g. "Work / Clients"), windows, running, moving }], groups [{ name, path, parent, color }], hub { id, name, path, running }` |
 | `windows` | | `windows [{ id, name, project, projectId, path, group, jarvis, state, title, message, answer (≤400 chars), answeredAt, question, hooks }]` |
 | `window` | `window` | one window as above, with its whole `answer` |
@@ -106,7 +101,7 @@ One JSON object per line, in both directions. A request is `{ "id": "<yours>", "
 | `screen` | `window`, `lines` (0 = the screen) | `window, name, state, text, cols, rows` |
 | `stop`, `close`, `show` | `window` | `window, name` |
 | `relaunch` | `window`, `resume` | `window, name` |
-| `addProject` | `path`, `group` (not from the phone) | `project { id, name, path, group }, added` |
+| `addProject` | `path`, `group` | `project { id, name, path, group }, added` |
 
 Sessions started through the API never take the keyboard from whoever types at the PC (`show` brings a window to
 the front on purpose). From PowerShell, without maidctl:
@@ -117,53 +112,11 @@ $writer = [System.IO.StreamWriter]::new($pipe); $reader = [System.IO.StreamReade
 $writer.WriteLine('{"id":"1","op":"windows"}'); $writer.Flush(); $reader.ReadLine()
 ```
 
-## The voice pipe (at the PC)
+## The voice pipe
 
-A push-to-talk program at the PC hands spoken requests to the voice window through `\\.\pipe\Maid.Voice`
-(`settings.voicePipe`, empty = off), guarded like the API's pipe. One JSON object per line: `{ "type": "voice",
-"ref": "<yours>", "text": "<the request>" }` is answered with `voiceSent { ref, id }` once it is in the voice window,
-then `voiceReply { ref, text }` (Claude's answer) or `voiceFailed { ref, message }`. `{ "type": "hello" }` is answered
-with `hello { app, version }`.
+A push-to-talk program at the PC hands spoken requests to the voice window in All projects (the tile marked
+*Jarvis*) through `\\.\pipe\Maid.Voice` (`settings.voicePipe`, empty = off; read at start), guarded like the API's
+pipe. One JSON object per line: `{ "type": "voice", "ref": "<yours>", "text": "<the request>" }` is answered with
+`voiceSent { ref, id }` once it is in the voice window, then `voiceReply { ref, text }` (Claude's answer) or
+`voiceFailed { ref, message }`. `{ "type": "hello" }` is answered with `hello { app, version }`.
 
-## The phone app's API (for a voice assistant)
-
-A voice assistant app on the phone binds the Maid phone app's service `com.xpnemec.maid/.JarvisRelay`. The relay lets
-in only the app the phone app was built for. Build the phone app with
-`-Pmaid.voiceApp.package=<that app's package> -Pmaid.voiceApp.certificate=<SHA-256 of its signing certificate, hex>`
-(or put both in `~/.gradle/gradle.properties`); without them it lets no app in. The assistant talks to the relay with
-`android.os.Messenger`, the data in each message's `Bundle`:
-
-- **Voice request:** `what = 1` (`MSG_SEND`), with `replyTo` set, data `{ "ref", "text" }`: the text goes into the
-  voice window in All projects. Answered with `what = 2` (`MSG_SENT`) `{ ref }`, then `3` (`MSG_REPLY`)
-  `{ ref, text }` with Claude's answer, or `4` (`MSG_FAILED`) `{ ref, message }`.
-
-- **Request:** `what = 5` (`MSG_API`), with `replyTo` set, data `{ "ref": "<yours, ≤64 chars>", "request": "<JSON
-  text>" }`.
-- **Answer:** `what = 6` (`MSG_API_RESULT`), data `{ "ref", "result": "<JSON text>" }`. The result is `{ "ok": true,
-  "result": {…} }` or `{ "ok": false, "error": "…" }`, exactly one per request.
-
-The requests are those of the table above; the app sends them over its link to Maid and hands back the answer. A
-few are the app's own:
-
-| op | arguments | result |
-|---|---|---|
-| `phone` | | `app, version, paired, link (connected/connecting/offline/…), computer, visible, showing (window id), showingName` |
-| `show` | `window` | `window, name, shown`. The app comes up showing that window (Maid resolves the name). |
-| `open` | | `shown`. The app comes up. |
-
-Some practical points for a voice assistant:
-
-- **Connecting:** a request connects the app to Maid when it is not connected, waiting up to 12 s. It fails if the
-  app isn't paired or the PC can't be reached.
-- **Timing:** `ask`/`wait` answer when the turn is over or after `timeout` seconds (default 600). Give spoken
-  requests a timeout that suits them, e.g. 120, and when `timedOut` comes back, say the session is still working.
-- **Bringing the app up:** Android lets an app in the background come to the front only in certain cases. When
-  Maid's app can't, `show`/`open` fail with an error that names the activity to start. The assistant can then start
-  `com.xpnemec.maid/.MainActivity` itself, with `FLAG_ACTIVITY_NEW_TASK` and the string extra `tile` = the window id;
-  an accessibility service's app may. Alternatively, the assistant binds the relay with `Context.BIND_ALLOW_ACTIVITY_STARTS`
-  (Android 14+) while it is visible.
-- **Wording:** voice-friendly names work as they are heard. "my app" finds `MyApp`, and
-  `windows[].state` and `answer` are short enough to read out.
-- **Testing:** debug builds of the Maid app have `DebugApiReceiver`, to try requests with adb:
-  `adb shell am broadcast -n com.xpnemec.maid/.DebugApiReceiver --es ref r1 --es request '{"op":"windows"}'`, with
-  answers in logcat under the tag `MaidApi`.

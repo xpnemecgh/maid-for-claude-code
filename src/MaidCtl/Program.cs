@@ -25,7 +25,7 @@ internal static class Program
         maidctl: control Maid, the dashboard of Claude Code sessions, from a shell.
 
         Reading
-          maidctl status                       Maid, its windows (how many work, ask), the phone
+          maidctl status                       Maid and its windows (how many work, ask)
           maidctl projects                     the listed projects by group, with their folders
           maidctl windows                      the open windows: name, state, id, last answer
           maidctl screen <window> [--lines N]  the text a window shows (or its last N lines, scrollback too)
@@ -48,7 +48,7 @@ internal static class Program
           maidctl show <window>                bring the window to the front in Maid on the PC
 
         The list
-          maidctl add <folder> [--group <name>]    list a project folder (not from the phone)
+          maidctl add <folder> [--group <name>]    list a project folder
 
         Other
           maidctl raw '<json>'                 send a request as it is, e.g. '{"op":"windows"}'
@@ -330,14 +330,9 @@ internal static class Program
             case "status":
             {
                 var windows = result["windows"];
-                var phone = result["phone"];
                 Console.WriteLine($"Maid {Str(result, "version")} (API {Int(result, "api")}){(Bool(result, "elevated") ? ", running as administrator" : "")}");
                 Console.WriteLine($"Projects: {Int(result, "projects")}");
                 Console.WriteLine($"Windows: {Int(windows, "open")} open, {Int(windows, "running")} running, {Int(windows, "working")} working, {Int(windows, "asking")} asking the user");
-                var phoneText = !Bool(phone, "enabled") ? "remote access off"
-                    : Bool(phone, "connected") ? $"connected{(Str(phone, "viewing") is { } viewing ? $", showing {viewing}" : "")}"
-                    : Str(phone, "paired") is { } paired ? $"{paired}, not connected" : "not paired";
-                Console.WriteLine($"Phone: {phoneText}");
                 if (Str(result, "window") is { Length: > 0 } self) Console.WriteLine($"This shell runs in window {self}.");
                 break;
             }

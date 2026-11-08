@@ -1,5 +1,4 @@
-// The terminal colours, shared by the dashboard (app.js) and the phone app, which bundles this file:
-// a group's colour has to look the same on both.
+// The terminal colours, used by the dashboard (app.js).
 (() => {
   'use strict';
 

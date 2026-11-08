@@ -11,7 +11,7 @@ namespace Maid.Remote;
 /// A way in for programs on this PC: a local named pipe that only the user's own programs can open, and, when
 /// Maid runs as administrator, only those that run as administrator too: the same programs that could already
 /// type into Maid's elevated window. Remote clients are refused by the pipe itself and by its access list.
-/// Nothing here touches the phone's way in. Messages are JSON, one per line, both ways (<see cref="Dashboard"/>
+/// Messages are JSON, one per line, both ways (<see cref="Dashboard"/>
 /// reads and writes them). Two of them: the voice pipe (push-to-talk at the PC, <see cref="VoiceName"/>) and
 /// the API pipe (<c>maidctl</c> and anything else that controls Maid, <see cref="ApiName"/>).
 /// </summary>

@@ -231,10 +231,6 @@ button.primary svg { width: 13px; height: 13px; }
 #hub-btn .entry-count { min-width: 16px; line-height: 16px; font-size: 10.5px; }
 #hub-btn[hidden], #hub-btn .entry-count[hidden] { display: none; }
 
-/* The phone app: lit while it may connect, its dot while it is connected. */
-#phone-btn .dot { width: 7px; height: 7px; display: none; }
-#phone-btn.is-connected .dot { display: block; border-color: var(--green); background: var(--green); }
-
 /* ---- edit mode: the list's editing controls only exist while it is on --------------------- */
 
 body:not(.editing) #new-session,
@@ -803,22 +799,6 @@ button.confirming {
   text-overflow: ellipsis;
 }
 .tile-state { color: var(--text-faint); font-size: 11.5px; white-space: nowrap; }
-/* The phone shows the session and the console has the phone's size; clicking takes it back. */
-.tile-phone {
-  display: none;
-  align-items: center;
-  gap: 4px;
-  height: 20px;
-  padding: 0 7px 0 5px;
-  border: 1px solid var(--border-strong);
-  border-radius: 5px;
-  color: var(--accent);
-  font-size: 11px;
-  white-space: nowrap;
-}
-.tile-phone svg { width: 12px; height: 12px; }
-.tile-phone:hover { background: var(--panel-hover); }
-.tile.is-phone-sized .tile-phone { display: inline-flex; }
 .tile.is-busy .tile-state { color: var(--accent); }
 .tile.is-attention .tile-state { color: var(--green); }
 .tile.is-failed .tile-state { color: var(--red); }
@@ -902,35 +882,7 @@ button.confirming {
 /* xterm.js 6 scrolls with its own slider; the legacy viewport's native scrollbar would peek out below the last row. */
 .xterm .xterm-viewport::-webkit-scrollbar { display: none; }
 
-/* ---- phone dialog ------------------------------------------------------------------------- */
-
-#phone-state { margin: 4px 0 0; }
-#phone-state p { margin: 0 0 4px; }
-.dialog p.good { color: var(--green); }
-#phone-pairing { display: flex; gap: 18px; align-items: center; margin: 14px 0 4px; }
-#phone-pairing[hidden] { display: none; }
-#phone-qr {
-  flex: none;
-  width: 232px;
-  height: 232px;
-  padding: 8px;
-  background: #fff;
-  border-radius: 8px;
-  image-rendering: pixelated;
-}
-#phone-pairing ol { margin: 0 0 10px; padding-left: 20px; color: var(--text-dim); }
-#phone-pairing li { margin-bottom: 6px; }
-#phone-pairing b { color: var(--text); }
-#phone-expiry { color: var(--accent) !important; }
-#phone-log-box { margin-top: 12px; color: var(--text-dim); }
-#phone-log-box summary { cursor: pointer; }
-#phone-log { margin: 6px 0 0; padding: 0; list-style: none; max-height: 160px; overflow: auto; font-size: 12px; user-select: text; -webkit-user-select: text; }
-#phone-log time { color: var(--text-faint); font-variant-numeric: tabular-nums; }
-.dialog-actions button.quiet-danger { margin-right: auto; border-color: transparent; color: #ffb4b9; }
-.dialog-actions button.quiet-danger:hover { background: rgba(239, 107, 115, .14); }
 .dialog-actions button[hidden] { display: none; }
-#phone-pairing .link-btn { color: var(--text-dim); font-size: 12px; text-decoration: underline; text-underline-offset: 2px; }
-#phone-pairing .link-btn:hover { color: var(--text); }
 
 /* ---- help --------------------------------------------------------------------------------- */
 

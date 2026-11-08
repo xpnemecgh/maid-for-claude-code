@@ -83,7 +83,6 @@ public partial class MainWindow : Window
             BrowseForFolder = BrowseForFolder,
         };
         _dashboard.SyncProjects();
-        _dashboard.StartRemote();
         _dashboard.StartVoicePipe();
         _dashboard.StartApiPipe();
 

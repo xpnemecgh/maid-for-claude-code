@@ -5,9 +5,8 @@ using Maid.Remote;
 namespace Maid;
 
 /// <summary>
-/// The voice pipe's side of the Dashboard: a push-to-talk program at this PC hands its spoken requests to the voice tile
-/// through a local named pipe (<see cref="LocalPipeServer"/>), exactly like a voice assistant's from the phone, and hears
-/// the answer.
+/// The voice pipe's side of the Dashboard: a push-to-talk program at this PC hands its spoken requests to the voice
+/// tile through a local named pipe (<see cref="LocalPipeServer"/>), and hears the answer.
 /// In: <c>hello</c>, <c>voice { ref, text }</c>. Out: <c>hello { app, version }</c>, <c>voiceSent { ref, id }</c>,
 /// <c>voiceReply { ref, text }</c>, <c>voiceFailed { ref, message }</c>.
 /// </summary>
@@ -60,7 +59,7 @@ internal sealed partial class Dashboard
                 break;
             case "voice":
                 var reference = Bounded(GetString(message, "ref"));
-                // Refs are the client's own: the page gets one that can't clash with the phone's or another client's.
+                // Refs are the client's own: the page gets one that can't clash with another client's.
                 PlaceVoice(new VoiceAsker(reference, client), $"pc{client.Number}:{reference}", GetString(message, "text"));
                 break;
         }
