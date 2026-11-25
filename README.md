@@ -129,6 +129,9 @@ layout, window placement). Edit its `settings` while Maid is closed:
 - `apiPipe` (`Maid.Api`; empty: none) is the pipe of Maid's API.
 
 `agents-md.json` next to it remembers what each project's `CLAUDE.md` and `AGENTS.md` last agreed on.
+`diagnostics.log` notes Maid's own troubles: each start, every failure or reload of its browser, and any part of Maid
+(its browser's GPU process, the page, Maid itself) that keeps half a CPU core or more busy for a minute, with how busy
+the whole PC was. Look there first if your PC slows down while Maid runs.
 Set `MAID_DATA_DIR` to keep state and the browser profile somewhere else.
 
 ## How it works

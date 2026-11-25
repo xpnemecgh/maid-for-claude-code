@@ -9,7 +9,7 @@
     <RootNamespace>Maid</RootNamespace>
     <AssemblyName>Maid</AssemblyName>
     <!-- Shown in the window title: raise it with every release. -->
-    <Version>1.6</Version>
+    <Version>1.6.1</Version>
     <Product>Maid</Product>
     <Description>Master dashboard for Claude Code sessions</Description>
     <ApplicationManifest>app.manifest</ApplicationManifest>

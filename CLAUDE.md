@@ -20,7 +20,9 @@ User-facing behaviour is described in README.md, Maid's API in docs/API.md.
   hooks, the API, the voice pipe), `Terminal/` (ConPTY sessions, launch command, Claude Code's HTTP hooks),
   `Remote/` (the local named pipes of the API and the voice window), `ConversationHistory.cs`, `SharedInfo.cs`,
   `ClaudeMdFile.cs` (CLAUDE.md/AGENTS.md sections and syncing), `Hub.cs` (All projects), `FolderMove.cs`,
-  `Elevation.cs` (Maid restarts itself elevated by default).
+  `Elevation.cs` (Maid restarts itself elevated by default), `Diagnostics.cs` (`<data dir>\diagnostics.log`: starts,
+  browser failures and reloads, Maid's own CPU load; `MainWindow` reloads a page WebView2 calls unresponsive only when
+  it does not answer a `ping` within 20 s).
 - `src/Maid/wwwroot`: the whole UI (`index.html`, `app.css`, `app.js`, `termcolor.js`; xterm.js vendored in `lib`).
 - `src/MaidCtl`: `maidctl`, the API's command line, copied into `cli\` next to Maid.exe.
 - `tests/Maid.Tests`: xUnit tests that drive `Dashboard.HandleMessage` as the page would.
@@ -32,3 +34,5 @@ User-facing behaviour is described in README.md, Maid's API in docs/API.md.
 - Maid opens no network port to the outside: its local pipes accept only the user's own programs (only elevated ones
   while Maid is elevated), and the hook server listens on 127.0.0.1 only. Keep it that way.
 - Tests that start real `claude` sessions use scratch folders only and give them no prompts.
+- No smooth infinite CSS animations: they make the page draw 60 frames a second for as long as they run (the status
+  dots run for hours). Animate in `steps()`, or with `transform`/`opacity` only.

@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Threading;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Win32;
 
@@ -87,7 +88,11 @@ public partial class MainWindow : Window
         _dashboard.StartApiPipe();
 
         core.SetVirtualHostNameToFolderMapping(UiHost, Path.Combine(AppContext.BaseDirectory, "wwwroot"), CoreWebView2HostResourceAccessKind.DenyCors);
-        core.WebMessageReceived += (_, e) => _dashboard.HandleMessage(e.WebMessageAsJson);
+        core.WebMessageReceived += (_, e) =>
+        {
+            PageAnswered();
+            _dashboard.HandleMessage(e.WebMessageAsJson);
+        };
         core.DocumentTitleChanged += (_, _) => Title = WindowTitle(core.DocumentTitle);
         core.NavigationStarting += (_, e) =>
         {
@@ -98,13 +103,137 @@ public partial class MainWindow : Window
         core.NewWindowRequested += (_, e) => e.Handled = true;
         core.ProcessFailed += (_, e) =>
         {
+            Note($"WebView2: {e.ProcessFailedKind} (reason {e.Reason}, exit code {e.ExitCode}"
+                + $"{(string.IsNullOrEmpty(e.ProcessDescription) ? "" : ", " + e.ProcessDescription)}).");
             // Sessions live in this process, not in the page: reload and the UI re-attaches to them.
-            if (e.ProcessFailedKind is CoreWebView2ProcessFailedKind.RenderProcessExited or CoreWebView2ProcessFailedKind.RenderProcessUnresponsive)
-                core.Reload();
+            if (e.ProcessFailedKind == CoreWebView2ProcessFailedKind.RenderProcessExited)
+                ReloadPage("its process had ended");
+            else if (e.ProcessFailedKind == CoreWebView2ProcessFailedKind.RenderProcessUnresponsive)
+                CheckPageHung();
         };
+
+        Note($"Maid {AppVersion} started{(Elevation.IsElevated ? " as administrator" : "")}, WebView2 {core.Environment.BrowserVersionString}.");
+        StartLoadWatch(core.Environment);
 
         core.Navigate($"https://{UiHost}/index.html");
         WebView.Focus();
+    }
+
+    // ---- diagnostics --------------------------------------------------------------------------------
+
+    /// <summary>How long the page has to answer before WebView2's "unresponsive" is taken as hung.</summary>
+    private static readonly TimeSpan HangGrace = TimeSpan.FromSeconds(20);
+
+    private readonly LoadWatch _loadWatch = new();
+    private readonly SystemLoad _systemLoad = new();
+    private DispatcherTimer? _loadTimer;
+    private DispatcherTimer? _hangTimer;
+    private DateTime? _pingedAt;
+
+    private void Note(string text) => DiagnosticsLog.Append(Path.Combine(_store.DataDirectory, DiagnosticsLog.FileName), text, DateTime.Now);
+
+    /// <summary>
+    /// WebView2 calls the page unresponsive when it has not taken input for a while, which also happens to a page
+    /// that is only slow because the PC is overloaded. Reloading then (as Maid used to, right away) rebuilds every
+    /// terminal at the worst moment, and the window is seen blinking. So the page is asked first, and only one that
+    /// does not answer within <see cref="HangGrace"/> is reloaded.
+    /// </summary>
+    private void CheckPageHung()
+    {
+        if (_pingedAt is not null) return; // asked already
+        _pingedAt = DateTime.UtcNow;
+        PostToPage("""{"type":"ping"}""");
+        _hangTimer = new DispatcherTimer { Interval = HangGrace };
+        _hangTimer.Tick += (_, _) =>
+        {
+            StopHangCheck();
+            ReloadPage($"it had not answered for {HangGrace.TotalSeconds:0} s");
+        };
+        _hangTimer.Start();
+    }
+
+    /// <summary>Any message from the page shows it is alive.</summary>
+    private void PageAnswered()
+    {
+        if (_pingedAt is not { } pinged) return;
+        StopHangCheck();
+        Note($"The page answered after {(DateTime.UtcNow - pinged).TotalSeconds:0.0} s; not reloaded.");
+    }
+
+    private void StopHangCheck()
+    {
+        _hangTimer?.Stop();
+        _hangTimer = null;
+        _pingedAt = null;
+    }
+
+    private void ReloadPage(string why)
+    {
+        Note($"Page reloaded: {why}.");
+        try
+        {
+            WebView.CoreWebView2?.Reload();
+        }
+        catch (Exception e) when (e is InvalidOperationException or COMException or ObjectDisposedException)
+        {
+            // The browser is going away with the window.
+        }
+    }
+
+    /// <summary>Every half minute: how much CPU Maid's processes used, noted when one kind of them keeps a core busy.</summary>
+    private void StartLoadWatch(CoreWebView2Environment environment)
+    {
+        _systemLoad.Sample();
+        // Not at background priority: that would starve when Maid itself is overloaded, the case worth a note most.
+        _loadTimer = new DispatcherTimer(DispatcherPriority.Normal) { Interval = TimeSpan.FromSeconds(30) };
+        _loadTimer.Tick += (_, _) => SampleLoad(environment);
+        _loadTimer.Start();
+        SampleLoad(environment);
+    }
+
+    private void SampleLoad(CoreWebView2Environment environment)
+    {
+        var processes = new List<LoadWatch.Sampled>();
+        try
+        {
+            foreach (var info in environment.GetProcessInfos())
+            {
+                if (CpuTime(info.ProcessId) is { } cpu)
+                    processes.Add(new(info.ProcessId, KindName(info.Kind), cpu));
+            }
+        }
+        catch (Exception e) when (e is COMException or InvalidOperationException or ObjectDisposedException)
+        {
+            return;
+        }
+        using (var self = System.Diagnostics.Process.GetCurrentProcess())
+            processes.Add(new(self.Id, "Maid", self.TotalProcessorTime));
+
+        var pc = _systemLoad.Sample();
+        var line = _loadWatch.Sample(DateTime.Now, processes, () =>
+            $"the PC at {(pc is { } load ? $"{load:P0}" : "?")} of {Environment.ProcessorCount} logical processors; {_dashboard?.DescribeWindows()}");
+        if (line is not null) Note(line);
+
+        static TimeSpan? CpuTime(int id)
+        {
+            try
+            {
+                using var process = System.Diagnostics.Process.GetProcessById(id);
+                return process.TotalProcessorTime;
+            }
+            catch (Exception e) when (e is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+            {
+                return null; // gone meanwhile
+            }
+        }
+
+        static string KindName(CoreWebView2ProcessKind kind) => kind switch
+        {
+            CoreWebView2ProcessKind.Gpu => "GPU process",
+            CoreWebView2ProcessKind.Renderer => "page",
+            CoreWebView2ProcessKind.Browser => "browser",
+            _ => "other browser processes",
+        };
     }
 
     private void PostToPage(string json)
@@ -149,6 +278,8 @@ public partial class MainWindow : Window
         }
 
         SavePlacement();
+        _loadTimer?.Stop();
+        StopHangCheck();
         // Stopping the sessions and saving their conversations can take a few seconds; the window
         // should not sit there unresponsive meanwhile.
         Hide();

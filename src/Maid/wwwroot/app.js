@@ -2161,6 +2161,11 @@
   // ---- messages from the host -----------------------------------------------------------------
 
   const handlers = {
+    /** WebView2 called the page unresponsive: answering shows it is not hung, so it is not reloaded (MainWindow). */
+    ping() {
+      post({ type: 'pong' });
+    },
+
     init(message) {
       state.entries = message.entries || [];
       state.groups = message.groups || [];

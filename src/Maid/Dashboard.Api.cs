@@ -856,6 +856,21 @@ internal sealed partial class Dashboard
         TrackTilesForApi(ids);
     }
 
+    /// <summary>"7 windows, 5 running: 3 working, 2 waiting for the user", from the tiles the page last sent (diagnostics).</summary>
+    public string DescribeWindows()
+    {
+        int windows = 0, running = 0, working = 0, waiting = 0;
+        foreach (var tile in _tiles.EnumerateArray())
+        {
+            if (tile.ValueKind != JsonValueKind.Object) continue;
+            windows++;
+            if (GetString(tile, "status") == "running") running++;
+            if (GetBool(tile, "busy")) working++;
+            if (GetBool(tile, "waiting")) waiting++;
+        }
+        return $"{windows} {(windows == 1 ? "window" : "windows")}, {running} running: {working} working, {waiting} waiting for the user";
+    }
+
     /// <summary>The page did (or could not do) what it was asked to with its tiles (<c>remote</c>).</summary>
     private void OnRemoteResult(JsonElement message)
     {

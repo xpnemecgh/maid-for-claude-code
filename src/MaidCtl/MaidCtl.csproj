@@ -10,7 +10,7 @@
     <AssemblyName>maidctl</AssemblyName>
     <RootNamespace>MaidCtl</RootNamespace>
     <!-- Goes with Maid's: raise both together (src\Maid\Maid.csproj). -->
-    <Version>1.6</Version>
+    <Version>1.6.1</Version>
     <Product>Maid</Product>
     <Description>Controls Maid (the dashboard of Claude Code sessions) through its API pipe</Description>
     <InvariantGlobalization>true</InvariantGlobalization>
