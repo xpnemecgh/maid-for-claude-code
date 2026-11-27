@@ -5,6 +5,8 @@ starts `claude --dangerously-skip-permissions` there — inside a real terminal 
 dashboard. All sessions are visible side by side in one window. **?** at the top right (F1) shows new users
 around.
 
+[Product page and screenshots](https://silenosworks.com/maid)
+
 ## Install
 
 Download `Maid-Setup-<version>.exe` from [Releases](https://github.com/xpnemecgh/maid-for-claude-code/releases) and
